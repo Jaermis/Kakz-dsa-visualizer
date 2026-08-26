@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Struct Visualizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-main">
+        <h1>Data Struct Visualizer</h1>
+        <p class="subtitle">Interactive Data Structures &amp; Algorithms Simulator (C Syntax)</p>
+      </div>
+
+      <!-- Top-Level Data Structure Navigation -->
+      <nav class="ds-nav" aria-label="Data Structure Selector">
+        <button class="ds-nav-btn active" data-ds="array">
+          Array
+        </button>
+        <button class="ds-nav-btn disabled" data-ds="linkedlist" title="Coming Soon">
+          Linked List <span class="badge-soon">Soon</span>
+        </button>
+        <button class="ds-nav-btn disabled" data-ds="stack" title="Coming Soon">
+          Stack <span class="badge-soon">Soon</span>
+        </button>
+        <button class="ds-nav-btn disabled" data-ds="queue" title="Coming Soon">
+          Queue <span class="badge-soon">Soon</span>
+        </button>
+        <button class="ds-nav-btn disabled" data-ds="tree" title="Coming Soon">
+          Binary Tree <span class="badge-soon">Soon</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Active Data Structure Content: Array -->
+    <main id="ds-content-array" class="ds-content-section">
+      <!-- Global Array Controls -->
+      <section class="panel">
+        <div class="panel-header">Array Setup</div>
+        <div class="controls-row">
+          <div class="control-group">
+            <label for="array-size">Size:</label>
+            <input type="number" id="array-size" min="3" max="16" value="8">
+            <button id="btn-resize" class="btn">Set Size</button>
+          </div>
+
+          <div class="control-group">
+            <button id="btn-randomize" class="btn btn-primary">Randomize Values</button>
+            <button id="btn-reset-zero" class="btn btn-secondary">Reset Array (All 0s)</button>
+          </div>
+
+          <div class="control-group custom-input-group">
+            <label for="custom-array-input">Custom Array:</label>
+            <input type="text" id="custom-array-input" placeholder="e.g. 12, 45, 7, 23, 89">
+            <button id="btn-apply-custom" class="btn">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Algorithm Operation Panel -->
+      <section class="panel">
+        <div class="panel-header">Select Algorithm (Array Operations)</div>
+        <div class="algo-tabs" id="algo-category-tabs">
+          <button class="tab-btn active" data-category="search">Searching</button>
+          <button class="tab-btn" data-category="insertion">Insertion</button>
+          <button class="tab-btn" data-category="deletion">Deletion</button>
+          <button class="tab-btn" data-category="reversal">Reversal</button>
+          <button class="tab-btn" data-category="rotation">Rotation</button>
+          <button class="tab-btn" data-category="sorting">Sorting</button>
+        </div>
+
+        <!-- Category Specific Forms -->
+        <div class="algo-sub-panel" id="algo-sub-panel">
+          
+          <!-- Searching Options -->
+          <div class="algo-options" id="opt-search">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="search-type">Type:</label>
+                <select id="search-type">
+                  <option value="linear">Linear Search</option>
+                  <option value="binary">Binary Search (Auto-sorts array)</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="search-target">Target Value to Search:</label>
+                <input type="number" id="search-target" value="25">
+              </div>
+              <button id="btn-start-search" class="btn btn-action">Start Search</button>
+            </div>
+          </div>
+
+          <!-- Insertion Options -->
+          <div class="algo-options hidden" id="opt-insertion">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="insert-val">Value to Insert:</label>
+                <input type="number" id="insert-val" value="99">
+              </div>
+              <div class="control-group">
+                <label for="insert-idx">Target Index (0 to Size):</label>
+                <input type="number" id="insert-idx" min="0" max="16" value="2">
+              </div>
+              <button id="btn-start-insertion" class="btn btn-action">Start Insertion</button>
+            </div>
+          </div>
+
+          <!-- Deletion Options -->
+          <div class="algo-options hidden" id="opt-deletion">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="delete-idx">Index to Delete (0 to Size-1):</label>
+                <input type="number" id="delete-idx" min="0" max="15" value="2">
+              </div>
+              <button id="btn-start-deletion" class="btn btn-action">Start Deletion</button>
+            </div>
+          </div>
+
+          <!-- Reversal Options -->
+          <div class="algo-options hidden" id="opt-reversal">
+            <div class="form-row">
+              <span class="info-text">Reverses the array in-place using the Two-Pointer technique (Left &amp; Right pointers).</span>
+              <button id="btn-start-reversal" class="btn btn-action">Start Reversal</button>
+            </div>
+          </div>
+
+          <!-- Rotation Options -->
+          <div class="algo-options hidden" id="opt-rotation">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="rotate-direction">Direction:</label>
+                <select id="rotate-direction">
+                  <option value="left">Left Shift ((i + k) % size)</option>
+                  <option value="right">Right Shift ((i + size - k) % size)</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="rotate-k">Positions (k):</label>
+                <input type="number" id="rotate-k" min="1" max="15" value="2">
+              </div>
+              <button id="btn-start-rotation" class="btn btn-action">Start Rotation</button>
+            </div>
+          </div>
+
+          <!-- Sorting Options -->
+          <div class="algo-options hidden" id="opt-sorting">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="sort-type">Sort Method:</label>
+                <select id="sort-type">
+                  <option value="bubble">Bubble Sort</option>
+                  <option value="selection">Selection Sort</option>
+                  <option value="insertion">Insertion Sort</option>
+                </select>
+              </div>
+              <button id="btn-start-sorting" class="btn btn-action">Start Sort</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Visualizer Stage -->
+      <section class="panel visualizer-section">
+        <div class="panel-header">Array Visualization</div>
+
+        <!-- Pointers Legend / Key Display -->
+        <div class="visualizer-legend" id="visualizer-legend">
+          <span class="legend-item"><span class="legend-box default"></span> Normal</span>
+          <span class="legend-item"><span class="legend-box current"></span> Active / Comparing</span>
+          <span class="legend-item"><span class="legend-box target"></span> Target / Key / Min</span>
+          <span class="legend-item"><span class="legend-box shifted"></span> Shifted / Swapped</span>
+          <span class="legend-item"><span class="legend-box success"></span> Found / Sorted</span>
+          <span class="legend-item"><span class="legend-box eliminated"></span> Inactive / Eliminated</span>
+        </div>
+
+        <!-- Main Array Box Container -->
+        <div class="array-stage">
+          <div class="array-wrapper" id="array-container">
+            <!-- Dynamic Array Boxes rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Auxiliary / Temp Box Area (for Insertion, Key, Swaps, Rotation) -->
+        <div class="aux-stage" id="aux-stage" style="display: none;">
+          <div class="aux-title" id="aux-title">Auxiliary / Temp Buffer:</div>
+          <div class="aux-boxes" id="aux-container">
+            <!-- Dynamic Aux Boxes rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Step Playback Toolbar -->
+        <div class="playback-toolbar">
+          <div class="playback-controls">
+            <button id="btn-prev-step" class="btn" title="Previous Step">&lt; Prev Step</button>
+            <button id="btn-next-step" class="btn btn-primary" title="Next Step / Iteration">Next Iteration &gt;</button>
+            <button id="btn-play-pause" class="btn">Auto Play</button>
+            <button id="btn-reset-algo" class="btn btn-secondary">Reset Simulation</button>
+          </div>
+
+          <div class="speed-controls">
+            <label for="speed-range">Speed:</label>
+            <input type="range" id="speed-range" min="100" max="1500" value="600" step="50">
+            <span id="speed-label">600ms</span>
+          </div>
+
+          <div class="step-indicator">
+            <span>Step: </span><strong id="step-counter">0 / 0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Execution Log & C Syntax Code Box -->
+      <section class="panel">
+        <div class="panel-header">C Syntax Code &amp; Execution Log</div>
+        <div class="status-box" id="status-box">
+          Select an algorithm and click Start to begin stepping through the execution.
+        </div>
+        <div class="code-box" id="code-box">
+/* Initial C Array Declaration */
+int arr[8] = {29, 10, 14, 37, 13, 85, 42, 6};
+int size = 8;
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
