@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Struct Visualizer</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.0">
 </head>
 <body>
   <div class="container">
@@ -34,8 +34,10 @@
       </nav>
     </header>
 
-    <!-- Main Active Data Structure Content: Array -->
-    <main id="ds-content-array" class="ds-content-section">
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Main Active Data Structure Content: Array -->
+      <div id="ds-content-array" class="ds-content-section">
       <!-- Global Array Controls -->
       <section class="panel">
         <div class="panel-header">Array Setup</div>
@@ -224,10 +226,11 @@ int arr[8] = {29, 10, 14, 37, 13, 85, 42, 6};
 int size = 8;
         </div>
       </section>
-    </main>
+      </div>
+      <!-- End of ds-content-array -->
 
-    <!-- Main Active Data Structure Content: Linked List -->
-    <main id="ds-content-linkedlist" class="ds-content-section hidden">
+      <!-- Main Active Data Structure Content: Linked List -->
+      <div id="ds-content-linkedlist" class="ds-content-section hidden">
       <!-- Linked List Setup Panel -->
       <section class="panel">
         <div class="panel-header">Singly Linked List Setup</div>
@@ -389,9 +392,11 @@ struct Node {
 };
         </div>
       </section>
+      </div>
+      <!-- End of ds-content-linkedlist -->
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.0"></script>
 </body>
 </html>

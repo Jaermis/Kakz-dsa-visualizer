@@ -53,6 +53,9 @@ function init() {
 function setupEventListeners() {
   // Top-Level Data Structure Navigation Tabs
   const dsButtons = document.querySelectorAll(".ds-nav-btn");
+  const arraySection = document.getElementById("ds-content-array");
+  const llSection = document.getElementById("ds-content-linkedlist");
+
   dsButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       const ds = btn.dataset.ds;
@@ -65,27 +68,39 @@ function setupEventListeners() {
         btn.classList.add("active");
 
         if (ds === "array") {
-          document.getElementById("ds-content-array").classList.remove("hidden");
-          document.getElementById("ds-content-linkedlist").classList.add("hidden");
+          if (arraySection) {
+            arraySection.classList.remove("hidden");
+            arraySection.style.display = "flex";
+          }
+          if (llSection) {
+            llSection.classList.add("hidden");
+            llSection.style.display = "none";
+          }
           pauseLLPlayback();
         } else if (ds === "linkedlist") {
-          document.getElementById("ds-content-array").classList.add("hidden");
-          document.getElementById("ds-content-linkedlist").classList.remove("hidden");
+          if (arraySection) {
+            arraySection.classList.add("hidden");
+            arraySection.style.display = "none";
+          }
+          if (llSection) {
+            llSection.classList.remove("hidden");
+            llSection.style.display = "flex";
+          }
           pausePlayback();
-          initLinkedListVisualizer();
+          renderLinkedListInitial();
         }
       }
     });
   });
 
-  // Algorithm Sub-Tabs
-  const tabButtons = document.querySelectorAll(".tab-btn");
+  // Algorithm Sub-Tabs for Array
+  const tabButtons = document.querySelectorAll("#algo-category-tabs .tab-btn");
   tabButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       tabButtons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const category = btn.dataset.category;
-      document.querySelectorAll(".algo-options").forEach(opt => opt.classList.add("hidden"));
+      document.querySelectorAll("#ds-content-array .algo-options").forEach(opt => opt.classList.add("hidden"));
       const activeOpt = document.getElementById(`opt-${category}`);
       if (activeOpt) activeOpt.classList.remove("hidden");
     });
@@ -2073,4 +2088,7 @@ function generateLLReversalSteps() {
 }
 
 // Run init on load
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  init();
+  initLinkedListVisualizer();
+});
