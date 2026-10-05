@@ -57,10 +57,23 @@ function setupEventListeners() {
     btn.addEventListener("click", () => {
       const ds = btn.dataset.ds;
       if (btn.classList.contains("disabled")) {
-        statusBox.textContent = `The ${btn.textContent.trim().replace("Soon", "").trim()} visualizer module is planned for a future update. The Array visualizer is currently active!`;
+        const titleName = btn.textContent.trim().replace("Soon", "").trim();
+        statusBox.textContent = `The ${titleName} visualizer module is planned for a future update.`;
+        if (llStatusBox) llStatusBox.textContent = `The ${titleName} visualizer module is planned for a future update.`;
       } else {
         dsButtons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
+
+        if (ds === "array") {
+          document.getElementById("ds-content-array").classList.remove("hidden");
+          document.getElementById("ds-content-linkedlist").classList.add("hidden");
+          pauseLLPlayback();
+        } else if (ds === "linkedlist") {
+          document.getElementById("ds-content-array").classList.add("hidden");
+          document.getElementById("ds-content-linkedlist").classList.remove("hidden");
+          pausePlayback();
+          initLinkedListVisualizer();
+        }
       }
     });
   });
@@ -1086,6 +1099,977 @@ function generateInsertionSortSteps() {
 
   currentArray = [...arr];
   setSimulationSteps(genSteps);
+}
+
+// ==========================================================================
+// SINGLY LINKED LIST VISUALIZER ENGINE (C SYNTAX)
+// ==========================================================================
+
+let currentLinkedList = [15, 28, 42, 67, 89];
+let llSteps = [];
+let llCurrentStepIndex = 0;
+let llIsPlaying = false;
+let llPlayInterval = null;
+let llPlaySpeed = 600; // ms
+let llInitialized = false;
+
+// Linked List DOM Elements
+let llChainContainer, llAuxStage, llAuxContainer, llAuxTitle;
+let llStatusBox, llCodeBox, llStepCounter, llSpeedRange, llSpeedLabel;
+let btnLlPrevStep, btnLlNextStep, btnLlPlayPause, btnLlResetAlgo;
+let btnLlRandomize, btnLlReset, btnLlResize, btnLlApplyCustom;
+let inputLlSize, inputLlCustom;
+
+function initLinkedListVisualizer() {
+  if (!llInitialized) {
+    setupLinkedListElements();
+    setupLinkedListEventListeners();
+    llInitialized = true;
+  }
+  renderLinkedListInitial();
+}
+
+function setupLinkedListElements() {
+  llChainContainer = document.getElementById("ll-chain-container");
+  llAuxStage = document.getElementById("ll-aux-stage");
+  llAuxContainer = document.getElementById("ll-aux-container");
+  llAuxTitle = document.getElementById("ll-aux-title");
+  llStatusBox = document.getElementById("ll-status-box");
+  llCodeBox = document.getElementById("ll-code-box");
+  llStepCounter = document.getElementById("ll-step-counter");
+  llSpeedRange = document.getElementById("ll-speed-range");
+  llSpeedLabel = document.getElementById("ll-speed-label");
+
+  btnLlPrevStep = document.getElementById("btn-ll-prev-step");
+  btnLlNextStep = document.getElementById("btn-ll-next-step");
+  btnLlPlayPause = document.getElementById("btn-ll-play-pause");
+  btnLlResetAlgo = document.getElementById("btn-ll-reset-algo");
+
+  btnLlRandomize = document.getElementById("btn-ll-randomize");
+  btnLlReset = document.getElementById("btn-ll-reset");
+  btnLlResize = document.getElementById("btn-ll-resize");
+  btnLlApplyCustom = document.getElementById("btn-ll-apply-custom");
+
+  inputLlSize = document.getElementById("ll-size");
+  inputLlCustom = document.getElementById("custom-ll-input");
+}
+
+function setupLinkedListEventListeners() {
+  // Linked List Sub-Tabs
+  const llTabButtons = document.querySelectorAll("#ll-category-tabs .tab-btn");
+  llTabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      llTabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const cat = btn.dataset.llcategory;
+      document.querySelectorAll("#ds-content-linkedlist .algo-options").forEach(opt => opt.classList.add("hidden"));
+      const activeOpt = document.getElementById(`opt-ll-${cat}`);
+      if (activeOpt) activeOpt.classList.remove("hidden");
+    });
+  });
+
+  // Dropdown toggles for Index input groups
+  const selectInsertPos = document.getElementById("ll-insert-pos");
+  const insertIdxGroup = document.getElementById("ll-insert-idx-group");
+  selectInsertPos.addEventListener("change", () => {
+    if (selectInsertPos.value === "index") {
+      insertIdxGroup.classList.remove("hidden");
+    } else {
+      insertIdxGroup.classList.add("hidden");
+    }
+  });
+
+  const selectDeletePos = document.getElementById("ll-delete-pos");
+  const deleteIdxGroup = document.getElementById("ll-delete-idx-group");
+  selectDeletePos.addEventListener("change", () => {
+    if (selectDeletePos.value === "index") {
+      deleteIdxGroup.classList.remove("hidden");
+    } else {
+      deleteIdxGroup.classList.add("hidden");
+    }
+  });
+
+  // Setup buttons
+  btnLlRandomize.addEventListener("click", randomizeLinkedList);
+  btnLlReset.addEventListener("click", resetLinkedList);
+  btnLlResize.addEventListener("click", resizeLinkedList);
+  btnLlApplyCustom.addEventListener("click", applyCustomLinkedList);
+
+  // Playback Controls
+  btnLlNextStep.addEventListener("click", stepLLForward);
+  btnLlPrevStep.addEventListener("click", stepLLBackward);
+  btnLlPlayPause.addEventListener("click", toggleLLPlayPause);
+  btnLlResetAlgo.addEventListener("click", resetLLSimulation);
+
+  llSpeedRange.addEventListener("input", (e) => {
+    llPlaySpeed = parseInt(e.target.value);
+    llSpeedLabel.textContent = `${llPlaySpeed}ms`;
+    if (llIsPlaying) {
+      clearInterval(llPlayInterval);
+      llPlayInterval = setInterval(stepLLForward, llPlaySpeed);
+    }
+  });
+
+  // Algorithm Start Buttons
+  document.getElementById("btn-ll-start-search").addEventListener("click", handleStartLLSearch);
+  document.getElementById("btn-ll-start-insertion").addEventListener("click", handleStartLLInsertion);
+  document.getElementById("btn-ll-start-deletion").addEventListener("click", handleStartLLDeletion);
+  document.getElementById("btn-ll-start-reversal").addEventListener("click", handleStartLLReversal);
+}
+
+function renderLinkedListInitial() {
+  clearLLSimulation();
+  renderLinkedListState({
+    nodes: currentLinkedList.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: currentLinkedList.length > 0 ? { 0: ["head"] } : {},
+    auxNode: null,
+    status: "Singly Linked List initialized. Select an operation to visualize.",
+    code: `/* Singly Linked List in C */\nstruct Node {\n    int data;\n    struct Node* next;\n};\n\nstruct Node* head = NULL; /* Initialized with ${currentLinkedList.length} node(s) */`
+  });
+  updateLLPlaybackControls();
+}
+
+// --- Linked List Base Management ---
+function randomizeLinkedList() {
+  pauseLLPlayback();
+  const len = currentLinkedList.length > 0 ? currentLinkedList.length : 5;
+  currentLinkedList = Array.from({ length: len }, () => Math.floor(Math.random() * 90) + 10);
+  clearLLSimulation();
+  renderLinkedListInitial();
+}
+
+function resetLinkedList() {
+  pauseLLPlayback();
+  currentLinkedList = [10];
+  if (inputLlSize) inputLlSize.value = 1;
+  clearLLSimulation();
+  renderLinkedListState({
+    nodes: [{ value: 10, state: "default", arrow: "right" }],
+    pointers: { 0: ["head"] },
+    auxNode: null,
+    status: "Linked list reset to a single node.",
+    code: `/* Single node list in C */\nstruct Node* head = (struct Node*)malloc(sizeof(struct Node));\nhead->data = 10;\nhead->next = NULL;`
+  });
+  updateLLPlaybackControls();
+}
+
+function resizeLinkedList() {
+  pauseLLPlayback();
+  const newSize = parseInt(inputLlSize.value);
+  if (isNaN(newSize) || newSize < 1 || newSize > 10) {
+    alert("Please enter a list length between 1 and 10.");
+    return;
+  }
+  if (newSize > currentLinkedList.length) {
+    while (currentLinkedList.length < newSize) {
+      currentLinkedList.push(Math.floor(Math.random() * 90) + 10);
+    }
+  } else {
+    currentLinkedList = currentLinkedList.slice(0, newSize);
+  }
+  clearLLSimulation();
+  renderLinkedListInitial();
+}
+
+function applyCustomLinkedList() {
+  pauseLLPlayback();
+  const raw = inputLlCustom.value.trim();
+  if (!raw) return;
+  const parts = raw.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+  if (parts.length < 1 || parts.length > 10) {
+    alert("Please provide between 1 and 10 comma-separated numbers.");
+    return;
+  }
+  currentLinkedList = parts;
+  if (inputLlSize) inputLlSize.value = parts.length;
+  clearLLSimulation();
+  renderLinkedListInitial();
+}
+
+// --- Linked List Simulation Runner ---
+function setLLSimulationSteps(generatedSteps) {
+  pauseLLPlayback();
+  llSteps = generatedSteps;
+  llCurrentStepIndex = 0;
+  if (llSteps.length > 0) {
+    renderLinkedListState(llSteps[0]);
+  }
+  updateLLPlaybackControls();
+}
+
+function clearLLSimulation() {
+  llSteps = [];
+  llCurrentStepIndex = 0;
+  updateLLPlaybackControls();
+}
+
+function stepLLForward() {
+  if (llCurrentStepIndex < llSteps.length - 1) {
+    llCurrentStepIndex++;
+    renderLinkedListState(llSteps[llCurrentStepIndex]);
+    updateLLPlaybackControls();
+  } else {
+    pauseLLPlayback();
+  }
+}
+
+function stepLLBackward() {
+  if (llCurrentStepIndex > 0) {
+    llCurrentStepIndex--;
+    renderLinkedListState(llSteps[llCurrentStepIndex]);
+    updateLLPlaybackControls();
+  }
+}
+
+function toggleLLPlayPause() {
+  if (llIsPlaying) {
+    pauseLLPlayback();
+  } else {
+    if (llSteps.length === 0) return;
+    if (llCurrentStepIndex >= llSteps.length - 1) {
+      llCurrentStepIndex = 0;
+      renderLinkedListState(llSteps[0]);
+    }
+    llIsPlaying = true;
+    btnLlPlayPause.textContent = "Pause";
+    btnLlPlayPause.classList.add("btn-primary");
+    llPlayInterval = setInterval(stepLLForward, llPlaySpeed);
+  }
+}
+
+function pauseLLPlayback() {
+  llIsPlaying = false;
+  clearInterval(llPlayInterval);
+  if (btnLlPlayPause) {
+    btnLlPlayPause.textContent = "Auto Play";
+    btnLlPlayPause.classList.remove("btn-primary");
+  }
+}
+
+function resetLLSimulation() {
+  pauseLLPlayback();
+  if (llSteps.length > 0) {
+    llCurrentStepIndex = 0;
+    renderLinkedListState(llSteps[0]);
+    updateLLPlaybackControls();
+  }
+}
+
+function updateLLPlaybackControls() {
+  if (!btnLlPrevStep) return;
+  const total = llSteps.length;
+  const current = total > 0 ? llCurrentStepIndex + 1 : 0;
+  llStepCounter.textContent = `${current} / ${total}`;
+
+  btnLlPrevStep.disabled = total === 0 || llCurrentStepIndex === 0;
+  btnLlNextStep.disabled = total === 0 || llCurrentStepIndex >= total - 1;
+  btnLlPlayPause.disabled = total === 0;
+  btnLlResetAlgo.disabled = total === 0;
+}
+
+// --- Linked List DOM Rendering ---
+function renderLinkedListState(step) {
+  if (!step || !llChainContainer) return;
+
+  const { nodes = [], pointers = {}, auxNode = null, status = "", code = "" } = step;
+
+  llChainContainer.innerHTML = "";
+
+  if (nodes.length === 0) {
+    // Empty list
+    const emptyWrapper = document.createElement("div");
+    emptyWrapper.className = "ll-node-wrapper";
+
+    const headCol = document.createElement("div");
+    headCol.className = "ll-node-col";
+    const ptrBox = document.createElement("div");
+    ptrBox.className = "pointers-container";
+    const badge = document.createElement("span");
+    badge.className = "pointer-badge ptr-head";
+    badge.textContent = "head";
+    ptrBox.appendChild(badge);
+    headCol.appendChild(ptrBox);
+
+    const arrow = document.createElement("div");
+    arrow.className = "ll-arrow";
+    arrow.textContent = "──▶";
+
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL";
+    nullCol.appendChild(nullBox);
+
+    emptyWrapper.appendChild(headCol);
+    emptyWrapper.appendChild(arrow);
+    emptyWrapper.appendChild(nullCol);
+    llChainContainer.appendChild(emptyWrapper);
+  } else {
+    nodes.forEach((node, idx) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "ll-node-wrapper";
+
+      const col = document.createElement("div");
+      col.className = "ll-node-col";
+
+      // Pointers above node
+      const ptrContainer = document.createElement("div");
+      ptrContainer.className = "pointers-container";
+      if (pointers[idx]) {
+        const ptrList = Array.isArray(pointers[idx]) ? pointers[idx] : [pointers[idx]];
+        ptrList.forEach(p => {
+          const badge = document.createElement("span");
+          const cleanName = p.toLowerCase().replace(/[^a-z]/g, "");
+          badge.className = `pointer-badge ptr-${cleanName}`;
+          badge.textContent = p;
+          ptrContainer.appendChild(badge);
+        });
+      }
+      col.appendChild(ptrContainer);
+
+      // Node box: [ data | next ]
+      const nodeBox = document.createElement("div");
+      nodeBox.className = `ll-node state-${node.state || "default"}`;
+
+      const dataBox = document.createElement("div");
+      dataBox.className = "ll-data";
+      dataBox.textContent = node.value !== undefined && node.value !== null ? node.value : "";
+      nodeBox.appendChild(dataBox);
+
+      const nextBox = document.createElement("div");
+      nextBox.className = "ll-next";
+      nextBox.textContent = "•";
+      nodeBox.appendChild(nextBox);
+
+      col.appendChild(nodeBox);
+
+      // Index label
+      const idxLabel = document.createElement("span");
+      idxLabel.className = "index-label";
+      idxLabel.textContent = `[${idx}]`;
+      col.appendChild(idxLabel);
+
+      wrapper.appendChild(col);
+
+      // Arrow connector
+      if (node.arrow !== "none") {
+        const arrow = document.createElement("div");
+        arrow.className = `ll-arrow ${node.arrow === "reversed" ? "reversed" : ""}`;
+        arrow.textContent = node.arrow === "reversed" ? "◀──" : "──▶";
+        wrapper.appendChild(arrow);
+      }
+
+      llChainContainer.appendChild(wrapper);
+    });
+
+    // Terminal NULL Box
+    const nullWrapper = document.createElement("div");
+    nullWrapper.className = "ll-node-wrapper";
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+
+    const nullPtr = document.createElement("div");
+    nullPtr.className = "pointers-container";
+    if (pointers["null"]) {
+      const badge = document.createElement("span");
+      badge.className = "pointer-badge ptr-curr";
+      badge.textContent = "curr = NULL";
+      nullPtr.appendChild(badge);
+    }
+    nullCol.appendChild(nullPtr);
+
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL";
+    nullCol.appendChild(nullBox);
+
+    const nullLabel = document.createElement("span");
+    nullLabel.className = "index-label";
+    nullLabel.textContent = "";
+    nullCol.appendChild(nullLabel);
+
+    nullWrapper.appendChild(nullCol);
+    llChainContainer.appendChild(nullWrapper);
+  }
+
+  // Auxiliary / Newly Allocated Node Stage
+  if (auxNode && auxNode.value !== undefined) {
+    llAuxStage.style.display = "flex";
+    llAuxTitle.textContent = auxNode.title || "Allocated Node (malloc / temp):";
+    llAuxContainer.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "ll-node-col";
+
+    const auxPtr = document.createElement("div");
+    auxPtr.className = "pointers-container";
+    if (auxNode.label) {
+      const badge = document.createElement("span");
+      const cleanName = auxNode.label.toLowerCase().replace(/[^a-z]/g, "");
+      badge.className = `pointer-badge ptr-${cleanName}`;
+      badge.textContent = auxNode.label;
+      auxPtr.appendChild(badge);
+    }
+    wrap.appendChild(auxPtr);
+
+    const auxNodeBox = document.createElement("div");
+    auxNodeBox.className = `ll-node state-${auxNode.state || "success"}`;
+
+    const dataBox = document.createElement("div");
+    dataBox.className = "ll-data";
+    dataBox.textContent = auxNode.value;
+    auxNodeBox.appendChild(dataBox);
+
+    const nextBox = document.createElement("div");
+    nextBox.className = "ll-next";
+    nextBox.textContent = "•";
+    auxNodeBox.appendChild(nextBox);
+
+    wrap.appendChild(auxNodeBox);
+    llAuxContainer.appendChild(wrap);
+  } else {
+    llAuxStage.style.display = "none";
+  }
+
+  // Update Status & Code
+  llStatusBox.textContent = status;
+  llCodeBox.textContent = code;
+}
+
+function createLLStep({ nodes, pointers = {}, auxNode = null, status = "", code = "" }) {
+  return {
+    nodes: nodes.map(n => ({ ...n })),
+    pointers: JSON.parse(JSON.stringify(pointers)),
+    auxNode: auxNode ? JSON.parse(JSON.stringify(auxNode)) : null,
+    status,
+    code
+  };
+}
+
+// ==========================================================================
+// LINKED LIST ALGORITHM STEP GENERATORS (C SYNTAX)
+// ==========================================================================
+
+// --- 1. SEARCH / TRAVERSAL ---
+function handleStartLLSearch() {
+  const target = parseInt(document.getElementById("ll-search-target").value);
+  if (isNaN(target)) {
+    alert("Please enter a valid target integer to search.");
+    return;
+  }
+  generateLLSearchSteps(target);
+}
+
+function generateLLSearchSteps(target) {
+  const list = [...currentLinkedList];
+  const n = list.length;
+  const genSteps = [];
+
+  const baseNodes = list.map(v => ({ value: v, state: "default", arrow: "right" }));
+
+  genSteps.push(createLLStep({
+    nodes: baseNodes,
+    pointers: n > 0 ? { 0: ["head", "curr"] } : { null: ["head=NULL"] },
+    status: `Starting Linked List search in C for target = ${target}. Setting curr = head.`,
+    code: `/* Search Linked List in C */\nstruct Node* searchNode(struct Node* head, int target) {\n    struct Node* curr = head;\n    while (curr != NULL) {\n        if (curr->data == target)\n            return curr;\n        curr = curr->next;\n    }\n    return NULL;\n}`
+  }));
+
+  let found = false;
+
+  for (let i = 0; i < n; i++) {
+    const stepNodes = list.map((v, idx) => ({
+      value: v,
+      state: idx === i ? "current" : (idx < i ? "eliminated" : "default"),
+      arrow: "right"
+    }));
+
+    const pointers = { [i]: ["curr"] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("head")) pointers[0].unshift("head");
+
+    genSteps.push(createLLStep({
+      nodes: stepNodes,
+      pointers,
+      status: `Inspecting node [${i}]: Checking if curr->data (${list[i]}) == target (${target}).`,
+      code: `/* Node [${i}] */\nif (curr->data == ${target}) /* Evaluates to ${list[i] === target ? "1 (true)" : "0 (false)"} */`
+    }));
+
+    if (list[i] === target) {
+      stepNodes[i].state = "success";
+      pointers[i] = ["curr", "FOUND!"];
+      genSteps.push(createLLStep({
+        nodes: stepNodes,
+        pointers,
+        status: `Match found! Node with value ${target} is located at position [${i}].`,
+        code: `return curr; /* Target node found with data = ${target} */`
+      }));
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    const finalNodes = list.map(v => ({ value: v, state: "eliminated", arrow: "right" }));
+    genSteps.push(createLLStep({
+      nodes: finalNodes,
+      pointers: { 0: ["head"], null: ["curr=NULL"] },
+      status: `curr reached NULL. Target ${target} not found in the linked list.`,
+      code: `return NULL; /* Target not found */`
+    }));
+  }
+
+  setLLSimulationSteps(genSteps);
+}
+
+// --- 2. INSERTION ---
+function handleStartLLInsertion() {
+  const pos = document.getElementById("ll-insert-pos").value;
+  const val = parseInt(document.getElementById("ll-insert-val").value);
+
+  if (isNaN(val)) {
+    alert("Please enter a valid value to insert.");
+    return;
+  }
+
+  if (currentLinkedList.length >= 10) {
+    alert("Linked list reached maximum capacity (10 nodes). Please delete a node first.");
+    return;
+  }
+
+  if (pos === "head") {
+    generateLLInsertHeadSteps(val);
+  } else if (pos === "tail") {
+    generateLLInsertTailSteps(val);
+  } else if (pos === "index") {
+    const idx = parseInt(document.getElementById("ll-insert-idx").value);
+    if (isNaN(idx) || idx < 0 || idx > currentLinkedList.length) {
+      alert(`Please enter an index between 0 and ${currentLinkedList.length}.`);
+      return;
+    }
+    generateLLInsertAtSteps(val, idx);
+  }
+}
+
+function generateLLInsertHeadSteps(val) {
+  const orig = [...currentLinkedList];
+  const genSteps = [];
+
+  // Step 1: Allocate node
+  genSteps.push(createLLStep({
+    nodes: orig.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: orig.length > 0 ? { 0: ["head"] } : {},
+    auxNode: { value: val, label: "new_node", state: "success" },
+    status: `Allocating memory for new node with data = ${val} in C.`,
+    code: `/* Insert at Head in C */\nstruct Node* new_node = (struct Node*)malloc(sizeof(struct Node));\nnew_node->data = ${val};\nnew_node->next = NULL;`
+  }));
+
+  // Step 2: Point new_node->next = head
+  genSteps.push(createLLStep({
+    nodes: orig.map(v => ({ value: v, state: "target", arrow: "right" })),
+    pointers: orig.length > 0 ? { 0: ["head"] } : {},
+    auxNode: { value: val, label: "new_node", state: "shifted" },
+    status: `Connecting new_node->next = head; pointing to previous head node.`,
+    code: `new_node->next = head; /* Point new node to current head */`
+  }));
+
+  // Step 3: head = new_node
+  const newList = [val, ...orig];
+  genSteps.push(createLLStep({
+    nodes: newList.map((v, i) => ({ value: v, state: i === 0 ? "success" : "default", arrow: "right" })),
+    pointers: { 0: ["head", "new_node"] },
+    auxNode: null,
+    status: `Reassigned head pointer to new_node. Insertion at head complete!`,
+    code: `head = new_node; /* New node is now the head */`
+  }));
+
+  currentLinkedList = newList;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+function generateLLInsertTailSteps(val) {
+  const orig = [...currentLinkedList];
+  const n = orig.length;
+  const genSteps = [];
+
+  // Step 1: Allocate node
+  genSteps.push(createLLStep({
+    nodes: orig.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: n > 0 ? { 0: ["head"] } : {},
+    auxNode: { value: val, label: "new_node", state: "success" },
+    status: `Allocating memory for new node with data = ${val} in C.`,
+    code: `/* Insert at Tail in C */\nstruct Node* new_node = (struct Node*)malloc(sizeof(struct Node));\nnew_node->data = ${val};\nnew_node->next = NULL;`
+  }));
+
+  if (n === 0) {
+    const newList = [val];
+    genSteps.push(createLLStep({
+      nodes: newList.map(v => ({ value: v, state: "success", arrow: "right" })),
+      pointers: { 0: ["head"] },
+      auxNode: null,
+      status: `List was empty. Setting head = new_node;`,
+      code: `head = new_node;`
+    }));
+    currentLinkedList = newList;
+    if (inputLlSize) inputLlSize.value = 1;
+    setLLSimulationSteps(genSteps);
+    return;
+  }
+
+  // Step 2: Traverse to tail
+  for (let i = 0; i < n; i++) {
+    const pointers = { [i]: ["curr"] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("head")) pointers[0].unshift("head");
+
+    genSteps.push(createLLStep({
+      nodes: orig.map((v, idx) => ({ value: v, state: idx === i ? "current" : "default", arrow: "right" })),
+      pointers,
+      auxNode: { value: val, label: "new_node", state: "target" },
+      status: i < n - 1 ? `Traversing list: curr = curr->next;` : `curr has reached the last node (curr->next == NULL).`,
+      code: i < n - 1 ? `curr = curr->next;` : `/* curr is at tail */\nwhile (curr->next != NULL) curr = curr->next;`
+    }));
+  }
+
+  // Step 3: curr->next = new_node
+  const newList = [...orig, val];
+  genSteps.push(createLLStep({
+    nodes: newList.map((v, i) => ({ value: v, state: i === n ? "success" : (i === n - 1 ? "shifted" : "default"), arrow: "right" })),
+    pointers: { 0: ["head"], [n]: ["tail"] },
+    auxNode: null,
+    status: `Connected tail node's next pointer to new_node. Insertion at tail complete!`,
+    code: `curr->next = new_node;\nnew_node->next = NULL;`
+  }));
+
+  currentLinkedList = newList;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+function generateLLInsertAtSteps(val, targetIdx) {
+  if (targetIdx === 0) {
+    generateLLInsertHeadSteps(val);
+    return;
+  }
+
+  const orig = [...currentLinkedList];
+  const n = orig.length;
+  const genSteps = [];
+
+  // Step 1: Allocate node
+  genSteps.push(createLLStep({
+    nodes: orig.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: { 0: ["head"] },
+    auxNode: { value: val, label: "new_node", state: "success" },
+    status: `Allocating memory for new node with data = ${val}.`,
+    code: `/* Insert at Index ${targetIdx} in C */\nstruct Node* new_node = (struct Node*)malloc(sizeof(struct Node));\nnew_node->data = ${val};`
+  }));
+
+  // Step 2: Traverse to predecessor (index targetIdx - 1)
+  for (let i = 0; i < targetIdx; i++) {
+    const pointers = { [i]: ["curr"] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("head")) pointers[0].unshift("head");
+
+    genSteps.push(createLLStep({
+      nodes: orig.map((v, idx) => ({ value: v, state: idx === i ? "current" : "default", arrow: "right" })),
+      pointers,
+      auxNode: { value: val, label: "new_node", state: "target" },
+      status: `Traversing to predecessor node at index [${targetIdx - 1}]. Currently at [${i}].`,
+      code: `for (int i = 0; i < ${targetIdx - 1}; i++) curr = curr->next;`
+    }));
+  }
+
+  // Step 3: Link new_node->next = curr->next
+  genSteps.push(createLLStep({
+    nodes: orig.map((v, idx) => ({ value: v, state: idx === targetIdx - 1 ? "current" : (idx === targetIdx ? "target" : "default"), arrow: "right" })),
+    pointers: { 0: ["head"], [targetIdx - 1]: ["curr"] },
+    auxNode: { value: val, label: "new_node", state: "shifted" },
+    status: `Connecting new_node->next = curr->next; (linking to successor node [${targetIdx}]).`,
+    code: `new_node->next = curr->next; /* Link new node to successor */`
+  }));
+
+  // Step 4: curr->next = new_node
+  const newList = [...orig.slice(0, targetIdx), val, ...orig.slice(targetIdx)];
+  genSteps.push(createLLStep({
+    nodes: newList.map((v, idx) => ({ value: v, state: idx === targetIdx ? "success" : "default", arrow: "right" })),
+    pointers: { 0: ["head"], [targetIdx]: ["inserted"] },
+    auxNode: null,
+    status: `Connected curr->next = new_node. Node spliced into position [${targetIdx}]!`,
+    code: `curr->next = new_node; /* Node successfully inserted */`
+  }));
+
+  currentLinkedList = newList;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+// --- 3. DELETION ---
+function handleStartLLDeletion() {
+  if (currentLinkedList.length === 0) {
+    alert("Linked list is already empty.");
+    return;
+  }
+
+  const pos = document.getElementById("ll-delete-pos").value;
+
+  if (pos === "head") {
+    generateLLDeleteHeadSteps();
+  } else if (pos === "tail") {
+    generateLLDeleteTailSteps();
+  } else if (pos === "index") {
+    const idx = parseInt(document.getElementById("ll-delete-idx").value);
+    if (isNaN(idx) || idx < 0 || idx >= currentLinkedList.length) {
+      alert(`Please enter an index between 0 and ${currentLinkedList.length - 1}.`);
+      return;
+    }
+    generateLLDeleteAtSteps(idx);
+  }
+}
+
+function generateLLDeleteHeadSteps() {
+  const orig = [...currentLinkedList];
+  const genSteps = [];
+  const deletedVal = orig[0];
+
+  // Step 1: temp = head
+  genSteps.push(createLLStep({
+    nodes: orig.map((v, idx) => ({ value: v, state: idx === 0 ? "target" : "default", arrow: "right" })),
+    pointers: { 0: ["head", "temp"] },
+    status: `Targeting head node for deletion. Setting temp = head;`,
+    code: `/* Delete at Head in C */\nstruct Node* temp = head;`
+  }));
+
+  // Step 2: head = head->next
+  const remaining = orig.slice(1);
+  genSteps.push(createLLStep({
+    nodes: remaining.map(v => ({ value: v, state: "shifted", arrow: "right" })),
+    pointers: remaining.length > 0 ? { 0: ["head"] } : {},
+    auxNode: { value: deletedVal, label: "temp", state: "eliminated", title: "Node to Free:" },
+    status: `Advancing head pointer: head = head->next;`,
+    code: `head = head->next; /* Head moved to next node */`
+  }));
+
+  // Step 3: free(temp)
+  genSteps.push(createLLStep({
+    nodes: remaining.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: remaining.length > 0 ? { 0: ["head"] } : {},
+    auxNode: null,
+    status: `Freed memory for deleted node with value ${deletedVal}. Deletion complete!`,
+    code: `free(temp); /* Deallocated node memory */`
+  }));
+
+  currentLinkedList = remaining;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+function generateLLDeleteTailSteps() {
+  const orig = [...currentLinkedList];
+  const n = orig.length;
+
+  if (n <= 1) {
+    generateLLDeleteHeadSteps();
+    return;
+  }
+
+  const genSteps = [];
+  const deletedVal = orig[n - 1];
+
+  // Step 1: Traverse to second to last node
+  for (let i = 0; i < n - 1; i++) {
+    const pointers = { [i]: ["curr"] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("head")) pointers[0].unshift("head");
+
+    genSteps.push(createLLStep({
+      nodes: orig.map((v, idx) => ({ value: v, state: idx === i ? "current" : "default", arrow: "right" })),
+      pointers,
+      status: i < n - 2 ? `Traversing to second-to-last node: curr = curr->next;` : `curr has reached the node before tail.`,
+      code: `while (curr->next->next != NULL) curr = curr->next;`
+    }));
+  }
+
+  // Step 2: temp = curr->next
+  genSteps.push(createLLStep({
+    nodes: orig.map((v, idx) => ({ value: v, state: idx === n - 1 ? "eliminated" : (idx === n - 2 ? "current" : "default"), arrow: "right" })),
+    pointers: { 0: ["head"], [n - 2]: ["curr"], [n - 1]: ["temp"] },
+    status: `Setting temp = curr->next (tail node to be freed).`,
+    code: `struct Node* temp = curr->next;`
+  }));
+
+  // Step 3: curr->next = NULL
+  const remaining = orig.slice(0, n - 1);
+  genSteps.push(createLLStep({
+    nodes: remaining.map((v, idx) => ({ value: v, state: idx === n - 2 ? "shifted" : "default", arrow: "right" })),
+    pointers: { 0: ["head"], [n - 2]: ["curr"] },
+    auxNode: { value: deletedVal, label: "temp", state: "eliminated", title: "Node to Free:" },
+    status: `Disconnecting tail: curr->next = NULL;`,
+    code: `curr->next = NULL; /* Break link to tail */`
+  }));
+
+  // Step 4: free(temp)
+  genSteps.push(createLLStep({
+    nodes: remaining.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: { 0: ["head"] },
+    auxNode: null,
+    status: `Freed memory for tail node (${deletedVal}). Deletion at tail complete!`,
+    code: `free(temp); /* Memory deallocated */`
+  }));
+
+  currentLinkedList = remaining;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+function generateLLDeleteAtSteps(targetIdx) {
+  if (targetIdx === 0) {
+    generateLLDeleteHeadSteps();
+    return;
+  }
+
+  const orig = [...currentLinkedList];
+  const n = orig.length;
+  const genSteps = [];
+  const deletedVal = orig[targetIdx];
+
+  // Step 1: Traverse to predecessor (targetIdx - 1)
+  for (let i = 0; i < targetIdx; i++) {
+    const pointers = { [i]: ["curr"] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("head")) pointers[0].unshift("head");
+
+    genSteps.push(createLLStep({
+      nodes: orig.map((v, idx) => ({ value: v, state: idx === i ? "current" : "default", arrow: "right" })),
+      pointers,
+      status: `Traversing to predecessor node at index [${targetIdx - 1}]. Currently at [${i}].`,
+      code: `for (int i = 0; i < ${targetIdx - 1}; i++) curr = curr->next;`
+    }));
+  }
+
+  // Step 2: temp = curr->next
+  genSteps.push(createLLStep({
+    nodes: orig.map((v, idx) => ({ value: v, state: idx === targetIdx ? "eliminated" : (idx === targetIdx - 1 ? "current" : "default"), arrow: "right" })),
+    pointers: { 0: ["head"], [targetIdx - 1]: ["curr"], [targetIdx]: ["temp"] },
+    status: `Setting temp = curr->next; identifying node [${targetIdx}] to delete.`,
+    code: `struct Node* temp = curr->next;`
+  }));
+
+  // Step 3: Link bypass curr->next = temp->next
+  const remaining = orig.filter((_, idx) => idx !== targetIdx);
+  genSteps.push(createLLStep({
+    nodes: remaining.map((v, idx) => ({ value: v, state: idx === targetIdx - 1 ? "shifted" : "default", arrow: "right" })),
+    pointers: { 0: ["head"], [targetIdx - 1]: ["curr"] },
+    auxNode: { value: deletedVal, label: "temp", state: "eliminated", title: "Node to Free:" },
+    status: `Bypassing deleted node: curr->next = temp->next;`,
+    code: `curr->next = temp->next; /* Bypass node [${targetIdx}] */`
+  }));
+
+  // Step 4: free(temp)
+  genSteps.push(createLLStep({
+    nodes: remaining.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: { 0: ["head"] },
+    auxNode: null,
+    status: `Freed memory for node [${targetIdx}] (${deletedVal}). Deletion complete!`,
+    code: `free(temp); /* Memory deallocated */`
+  }));
+
+  currentLinkedList = remaining;
+  if (inputLlSize) inputLlSize.value = currentLinkedList.length;
+  setLLSimulationSteps(genSteps);
+}
+
+// --- 4. REVERSAL ---
+function handleStartLLReversal() {
+  if (currentLinkedList.length <= 1) {
+    alert("Reversal requires at least 2 nodes.");
+    return;
+  }
+  generateLLReversalSteps();
+}
+
+function generateLLReversalSteps() {
+  const orig = [...currentLinkedList];
+  const n = orig.length;
+  const genSteps = [];
+
+  // Working representation
+  const nodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+
+  // Initial step
+  genSteps.push(createLLStep({
+    nodes,
+    pointers: { 0: ["head", "curr"] },
+    status: "Starting in-place Linked List Reversal in C with 3 pointers: prev = NULL, curr = head, next_node = NULL.",
+    code: `/* In-place Linked List Reversal in C */\nstruct Node* reverseList(struct Node* head) {\n    struct Node* prev = NULL;\n    struct Node* curr = head;\n    struct Node* next_node = NULL;\n    while (curr != NULL) {\n        next_node = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = next_node;\n    }\n    return prev;\n}`
+  }));
+
+  let prevIdx = null;
+  let currIdx = 0;
+
+  while (currIdx < n) {
+    const nextIdx = currIdx + 1 < n ? currIdx + 1 : null;
+
+    // Sub-step 1: next_node = curr->next
+    const step1Pointers = {};
+    if (currIdx === 0 && !step1Pointers[0]) step1Pointers[0] = [];
+    step1Pointers[currIdx] = ["curr"];
+    if (prevIdx !== null) step1Pointers[prevIdx] = ["prev"];
+    if (nextIdx !== null) step1Pointers[nextIdx] = ["next_node"];
+
+    nodes[currIdx].state = "current";
+    if (prevIdx !== null) nodes[prevIdx].state = "target";
+    if (nextIdx !== null) nodes[nextIdx].state = "shifted";
+
+    genSteps.push(createLLStep({
+      nodes,
+      pointers: step1Pointers,
+      status: `Preserving reference to next node: next_node = curr->next (val: ${nextIdx !== null ? orig[nextIdx] : "NULL"}).`,
+      code: `next_node = curr->next; /* Saved next node pointer */`
+    }));
+
+    // Sub-step 2: curr->next = prev
+    nodes[currIdx].arrow = "reversed";
+    nodes[currIdx].state = "shifted";
+
+    genSteps.push(createLLStep({
+      nodes,
+      pointers: step1Pointers,
+      status: `Reversing link of node [${currIdx}]: curr->next = prev; (arrow now points back to ${prevIdx !== null ? `node [${prevIdx}]` : "NULL"}).`,
+      code: `curr->next = prev; /* Pointer reversed */`
+    }));
+
+    // Sub-step 3: prev = curr; curr = next_node;
+    prevIdx = currIdx;
+    currIdx = nextIdx !== null ? nextIdx : n;
+
+    const step3Pointers = {};
+    if (prevIdx !== null) step3Pointers[prevIdx] = ["prev"];
+    if (currIdx < n) step3Pointers[currIdx] = ["curr"];
+    else step3Pointers["null"] = ["curr=NULL"];
+
+    genSteps.push(createLLStep({
+      nodes,
+      pointers: step3Pointers,
+      status: `Advancing pointers: prev = curr; curr = next_node;`,
+      code: `prev = curr;\ncurr = next_node;`
+    }));
+  }
+
+  // Final step: head = prev, layout flipped cleanly
+  const reversedList = [...orig].reverse();
+  const finalNodes = reversedList.map(v => ({ value: v, state: "success", arrow: "right" }));
+
+  genSteps.push(createLLStep({
+    nodes: finalNodes,
+    pointers: { 0: ["head", "prev"] },
+    status: `curr reached NULL. Setting head = prev. Linked list is successfully reversed!`,
+    code: `head = prev;\nreturn head; /* Reversal complete */`
+  }));
+
+  currentLinkedList = reversedList;
+  setLLSimulationSteps(genSteps);
 }
 
 // Run init on load

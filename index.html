@@ -19,8 +19,8 @@
         <button class="ds-nav-btn active" data-ds="array">
           Array
         </button>
-        <button class="ds-nav-btn disabled" data-ds="linkedlist" title="Coming Soon">
-          Linked List <span class="badge-soon">Soon</span>
+        <button class="ds-nav-btn" data-ds="linkedlist">
+          Linked List
         </button>
         <button class="ds-nav-btn disabled" data-ds="stack" title="Coming Soon">
           Stack <span class="badge-soon">Soon</span>
@@ -222,6 +222,171 @@
 /* Initial C Array Declaration */
 int arr[8] = {29, 10, 14, 37, 13, 85, 42, 6};
 int size = 8;
+        </div>
+      </section>
+    </main>
+
+    <!-- Main Active Data Structure Content: Linked List -->
+    <main id="ds-content-linkedlist" class="ds-content-section hidden">
+      <!-- Linked List Setup Panel -->
+      <section class="panel">
+        <div class="panel-header">Singly Linked List Setup</div>
+        <div class="controls-row">
+          <div class="control-group">
+            <label for="ll-size">Length:</label>
+            <input type="number" id="ll-size" min="1" max="10" value="5">
+            <button id="btn-ll-resize" class="btn">Set Length</button>
+          </div>
+
+          <div class="control-group">
+            <button id="btn-ll-randomize" class="btn btn-primary">Randomize Values</button>
+            <button id="btn-ll-reset" class="btn btn-secondary">Reset List (Single Node)</button>
+          </div>
+
+          <div class="control-group custom-input-group">
+            <label for="custom-ll-input">Custom List:</label>
+            <input type="text" id="custom-ll-input" placeholder="e.g. 15, 28, 42, 67, 89">
+            <button id="btn-ll-apply-custom" class="btn">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Linked List Operations Panel -->
+      <section class="panel">
+        <div class="panel-header">Select Algorithm (Linked List Operations)</div>
+        <div class="algo-tabs" id="ll-category-tabs">
+          <button class="tab-btn active" data-llcategory="search">Traversal &amp; Search</button>
+          <button class="tab-btn" data-llcategory="insertion">Insertion</button>
+          <button class="tab-btn" data-llcategory="deletion">Deletion</button>
+          <button class="tab-btn" data-llcategory="reversal">Reversal</button>
+        </div>
+
+        <div class="algo-sub-panel">
+          <!-- Search Options -->
+          <div class="algo-options" id="opt-ll-search">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="ll-search-target">Target Value to Search:</label>
+                <input type="number" id="ll-search-target" value="42">
+              </div>
+              <button id="btn-ll-start-search" class="btn btn-action">Start Search</button>
+            </div>
+          </div>
+
+          <!-- Insertion Options -->
+          <div class="algo-options hidden" id="opt-ll-insertion">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="ll-insert-pos">Position:</label>
+                <select id="ll-insert-pos">
+                  <option value="head">At Head (Beginning)</option>
+                  <option value="tail">At Tail (End)</option>
+                  <option value="index">At Index (0 to Length)</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="ll-insert-val">Value:</label>
+                <input type="number" id="ll-insert-val" value="99">
+              </div>
+              <div class="control-group hidden" id="ll-insert-idx-group">
+                <label for="ll-insert-idx">Index:</label>
+                <input type="number" id="ll-insert-idx" min="0" max="10" value="2">
+              </div>
+              <button id="btn-ll-start-insertion" class="btn btn-action">Start Insertion</button>
+            </div>
+          </div>
+
+          <!-- Deletion Options -->
+          <div class="algo-options hidden" id="opt-ll-deletion">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="ll-delete-pos">Position:</label>
+                <select id="ll-delete-pos">
+                  <option value="head">At Head (Beginning)</option>
+                  <option value="tail">At Tail (End)</option>
+                  <option value="index">At Index (0 to Length-1)</option>
+                </select>
+              </div>
+              <div class="control-group hidden" id="ll-delete-idx-group">
+                <label for="ll-delete-idx">Index to Delete:</label>
+                <input type="number" id="ll-delete-idx" min="0" max="9" value="2">
+              </div>
+              <button id="btn-ll-start-deletion" class="btn btn-action">Start Deletion</button>
+            </div>
+          </div>
+
+          <!-- Reversal Options -->
+          <div class="algo-options hidden" id="opt-ll-reversal">
+            <div class="form-row">
+              <span class="info-text">Reverses the linked list in-place using 3 pointers: <code>prev</code>, <code>curr</code>, and <code>next_node</code>.</span>
+              <button id="btn-ll-start-reversal" class="btn btn-action">Start Reversal</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Linked List Visualizer Stage -->
+      <section class="panel visualizer-section">
+        <div class="panel-header">Linked List Visualization</div>
+
+        <!-- Legend -->
+        <div class="visualizer-legend">
+          <span class="legend-item"><span class="legend-box default"></span> Node</span>
+          <span class="legend-item"><span class="legend-box current"></span> Active / curr</span>
+          <span class="legend-item"><span class="legend-box target"></span> Target / prev</span>
+          <span class="legend-item"><span class="legend-box shifted"></span> next_node / Modified</span>
+          <span class="legend-item"><span class="legend-box success"></span> Found / New Node</span>
+          <span class="legend-item"><span class="legend-box eliminated"></span> Freed / Detached</span>
+        </div>
+
+        <!-- Main Linked List Chain Container -->
+        <div class="ll-stage">
+          <div class="ll-chain-wrapper" id="ll-chain-container">
+            <!-- Dynamic Linked List Nodes rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Auxiliary / Newly Allocated Node Stage -->
+        <div class="aux-stage" id="ll-aux-stage" style="display: none;">
+          <div class="aux-title" id="ll-aux-title">Allocated Node (malloc / temp):</div>
+          <div class="aux-boxes" id="ll-aux-container">
+            <!-- Dynamic Aux Node rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="playback-toolbar">
+          <div class="playback-controls">
+            <button id="btn-ll-prev-step" class="btn" title="Previous Step">&lt; Prev Step</button>
+            <button id="btn-ll-next-step" class="btn btn-primary" title="Next Step / Iteration">Next Iteration &gt;</button>
+            <button id="btn-ll-play-pause" class="btn">Auto Play</button>
+            <button id="btn-ll-reset-algo" class="btn btn-secondary">Reset Simulation</button>
+          </div>
+
+          <div class="speed-controls">
+            <label for="ll-speed-range">Speed:</label>
+            <input type="range" id="ll-speed-range" min="100" max="1500" value="600" step="50">
+            <span id="ll-speed-label">600ms</span>
+          </div>
+
+          <div class="step-indicator">
+            <span>Step: </span><strong id="ll-step-counter">0 / 0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Execution Log & C Syntax Code Box for Linked List -->
+      <section class="panel">
+        <div class="panel-header">C Syntax Code &amp; Execution Log (Singly Linked List)</div>
+        <div class="status-box" id="ll-status-box">
+          Select an algorithm and click Start to begin stepping through the linked list execution.
+        </div>
+        <div class="code-box" id="ll-code-box">
+/* Singly Linked List Node Definition in C */
+struct Node {
+    int data;
+    struct Node* next;
+};
         </div>
       </section>
     </main>

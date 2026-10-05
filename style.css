@@ -533,3 +533,169 @@ select:focus {
     font-size: 16px;
   }
 }
+
+/* ==========================================================================
+   LINKED LIST VISUALIZATION STYLES (FLAT, NO SHADOWS, NO GLOWS)
+   ========================================================================== */
+
+.ll-stage {
+  padding: 28px 12px;
+  overflow-x: auto;
+  min-height: 160px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: #fafafa;
+  border: 1px solid #e5e7eb;
+}
+
+.ll-chain-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0 auto;
+}
+
+.ll-node-wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ll-node-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ll-node {
+  display: inline-flex;
+  border: 2px solid #111827;
+  background-color: #ffffff;
+  user-select: none;
+}
+
+.ll-data {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ll-next {
+  width: 24px;
+  height: 50px;
+  border-left: 1px solid #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #374151;
+  background-color: #f9fafb;
+}
+
+/* Node States */
+.ll-node.state-default {
+  background-color: #ffffff;
+  border-color: #111827;
+}
+
+.ll-node.state-current {
+  background-color: #dbeafe;
+  border-color: #2563eb;
+}
+.ll-node.state-current .ll-data {
+  color: #1e3a8a;
+}
+
+.ll-node.state-target {
+  background-color: #fef08a;
+  border-color: #ca8a04;
+}
+.ll-node.state-target .ll-data {
+  color: #713f12;
+}
+
+.ll-node.state-shifted {
+  background-color: #fed7aa;
+  border-color: #ea580c;
+}
+.ll-node.state-shifted .ll-data {
+  color: #7c2d12;
+}
+
+.ll-node.state-success {
+  background-color: #bbf7d0;
+  border-color: #16a34a;
+}
+.ll-node.state-success .ll-data {
+  color: #14532d;
+}
+
+.ll-node.state-eliminated {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+.ll-node.state-eliminated .ll-data {
+  color: #9ca3af;
+}
+
+/* Pointer Arrow */
+.ll-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-family: monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  user-select: none;
+}
+
+.ll-arrow.reversed {
+  color: #ea580c;
+}
+
+.ll-arrow.broken {
+  color: #dc2626;
+  text-decoration: line-through;
+}
+
+/* NULL Box */
+.ll-null-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ll-null {
+  height: 50px;
+  padding: 0 12px;
+  border: 2px dashed #4b5563;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4b5563;
+  user-select: none;
+}
+
+/* Additional Pointer Badges for Linked List */
+.pointer-badge.ptr-head { background-color: #111827; border-color: #000000; }
+.pointer-badge.ptr-curr { background-color: #2563eb; border-color: #1d4ed8; }
+.pointer-badge.ptr-prev { background-color: #d97706; border-color: #b45309; }
+.pointer-badge.ptr-nextnode { background-color: #7c3aed; border-color: #6d28d9; }
+.pointer-badge.ptr-newnode { background-color: #16a34a; border-color: #15803d; }
+.pointer-badge.ptr-temp { background-color: #dc2626; border-color: #b91c1c; }
+.pointer-badge.ptr-tail { background-color: #0d9488; border-color: #0f766e; }
+
