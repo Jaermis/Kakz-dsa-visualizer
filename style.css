@@ -690,13 +690,18 @@ select:focus {
   user-select: none;
 }
 
-/* Additional Pointer Badges for Linked List */
+/* Additional Pointer Badges for Linked List, Stack, and Queue */
 .pointer-badge.ptr-head { background-color: #111827; border-color: #000000; }
+.pointer-badge.ptr-top { background-color: #b91c1c; border-color: #991b1b; }
+.pointer-badge.ptr-front { background-color: #0284c7; border-color: #0369a1; }
+.pointer-badge.ptr-rear { background-color: #7c3aed; border-color: #6d28d9; }
 .pointer-badge.ptr-curr, .pointer-badge.ptr-current { background-color: #2563eb; border-color: #1d4ed8; }
 .pointer-badge.ptr-prev { background-color: #d97706; border-color: #b45309; }
 .pointer-badge.ptr-nextnode { background-color: #7c3aed; border-color: #6d28d9; }
 .pointer-badge.ptr-newnode { background-color: #16a34a; border-color: #15803d; }
 .pointer-badge.ptr-temp { background-color: #dc2626; border-color: #b91c1c; }
 .pointer-badge.ptr-tail { background-color: #0d9488; border-color: #0f766e; }
+.pointer-badge.ptr-count { background-color: #374151; border-color: #1f2937; }
+
 
 

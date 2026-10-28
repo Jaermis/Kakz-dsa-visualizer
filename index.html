@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Struct Visualizer</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
   <div class="container">
@@ -22,11 +22,11 @@
         <button class="ds-nav-btn" data-ds="linkedlist">
           Linked List
         </button>
-        <button class="ds-nav-btn disabled" data-ds="stack" title="Coming Soon">
-          Stack <span class="badge-soon">Soon</span>
+        <button class="ds-nav-btn" data-ds="stack">
+          Stack
         </button>
-        <button class="ds-nav-btn disabled" data-ds="queue" title="Coming Soon">
-          Queue <span class="badge-soon">Soon</span>
+        <button class="ds-nav-btn" data-ds="queue">
+          Queue
         </button>
         <button class="ds-nav-btn disabled" data-ds="tree" title="Coming Soon">
           Binary Tree <span class="badge-soon">Soon</span>
@@ -408,9 +408,346 @@ List head = initialize();
       </section>
       </div>
       <!-- End of ds-content-linkedlist -->
+
+      <!-- Main Active Data Structure Content: Stack -->
+      <div id="ds-content-stack" class="ds-content-section hidden">
+      <!-- Stack Setup Panel -->
+      <section class="panel">
+        <div class="panel-header">Stack Setup (LIFO - Top of Stack)</div>
+        <div class="controls-row">
+          <div class="control-group">
+            <label for="stack-size">Length:</label>
+            <input type="number" id="stack-size" min="0" max="10" value="3">
+            <button id="btn-stack-resize" class="btn">Set Length</button>
+          </div>
+
+          <div class="control-group">
+            <button id="btn-stack-sample" class="btn btn-primary">main() Stack [30, 20, 10]</button>
+            <button id="btn-stack-randomize" class="btn">Randomize Values</button>
+            <button id="btn-stack-reset" class="btn btn-secondary">initialize() (NULL)</button>
+          </div>
+
+          <div class="control-group custom-input-group">
+            <label for="custom-stack-input">Custom Stack:</label>
+            <input type="text" id="custom-stack-input" placeholder="e.g. 30, 20, 10">
+            <button id="btn-stack-apply-custom" class="btn">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stack Operations Panel -->
+      <section class="panel">
+        <div class="panel-header">Select Algorithm (Stack Operations - C Implementation)</div>
+        <div class="algo-tabs" id="stack-category-tabs">
+          <button class="tab-btn active" data-stackcategory="push">push()</button>
+          <button class="tab-btn" data-stackcategory="pop">pop()</button>
+          <button class="tab-btn" data-stackcategory="peek">peek()</button>
+          <button class="tab-btn" data-stackcategory="isEmpty">isEmpty()</button>
+          <button class="tab-btn" data-stackcategory="countNodes">countNodes()</button>
+          <button class="tab-btn" data-stackcategory="clear">clear()</button>
+        </div>
+
+        <div class="algo-sub-panel">
+          <!-- push -->
+          <div class="algo-options" id="opt-stack-push">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="stack-push-val">item (data to push):</label>
+                <input type="number" id="stack-push-val" value="40">
+              </div>
+              <button id="btn-stack-start-push" class="btn btn-action">Run push(top, item)</button>
+            </div>
+          </div>
+
+          <!-- pop -->
+          <div class="algo-options hidden" id="opt-stack-pop">
+            <div class="form-row">
+              <span class="info-text">Pops the top node, stores value in <code>*item</code>, and updates <code>top = top-&gt;next</code>.</span>
+              <button id="btn-stack-start-pop" class="btn btn-action">Run pop(top, &amp;value)</button>
+            </div>
+          </div>
+
+          <!-- peek -->
+          <div class="algo-options hidden" id="opt-stack-peek">
+            <div class="form-row">
+              <span class="info-text">Inspects the top element without removing it (<code>*item = top-&gt;data</code>).</span>
+              <button id="btn-stack-start-peek" class="btn btn-action">Run peek(top, &amp;value)</button>
+            </div>
+          </div>
+
+          <!-- isEmpty -->
+          <div class="algo-options hidden" id="opt-stack-isEmpty">
+            <div class="form-row">
+              <span class="info-text">Checks if the stack is empty (<code>top == NULL</code>). Returns 1 if empty, 0 otherwise.</span>
+              <button id="btn-stack-start-isEmpty" class="btn btn-action">Run isEmpty(top)</button>
+            </div>
+          </div>
+
+          <!-- countNodes -->
+          <div class="algo-options hidden" id="opt-stack-countNodes">
+            <div class="form-row">
+              <span class="info-text">Traverses from <code>top</code> to <code>NULL</code> and counts total nodes using <code>countNodes(top)</code>.</span>
+              <button id="btn-stack-start-countNodes" class="btn btn-action">Run countNodes(top)</button>
+            </div>
+          </div>
+
+          <!-- clear -->
+          <div class="algo-options hidden" id="opt-stack-clear">
+            <div class="form-row">
+              <span class="info-text">Repeatedly calls <code>pop(top, NULL)</code> until <code>top == NULL</code>.</span>
+              <button id="btn-stack-start-clear" class="btn btn-action">Run clear(top)</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stack Visualizer Stage -->
+      <section class="panel visualizer-section">
+        <div class="panel-header">Stack Visualization (LIFO - Top of Stack)</div>
+
+        <!-- Legend -->
+        <div class="visualizer-legend">
+          <span class="legend-item"><span class="legend-box default"></span> Node</span>
+          <span class="legend-item"><span class="legend-box current"></span> current</span>
+          <span class="legend-item"><span class="legend-box target"></span> top</span>
+          <span class="legend-item"><span class="legend-box shifted"></span> temp</span>
+          <span class="legend-item"><span class="legend-box success"></span> newNode / Peek</span>
+          <span class="legend-item"><span class="legend-box eliminated"></span> Popped / Freed</span>
+        </div>
+
+        <!-- Main Stack Chain Container -->
+        <div class="ll-stage">
+          <div class="ll-chain-wrapper" id="stack-chain-container">
+            <!-- Dynamic Stack Nodes rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Auxiliary / Newly Allocated Node Stage -->
+        <div class="aux-stage" id="stack-aux-stage" style="display: none;">
+          <div class="aux-title" id="stack-aux-title">Allocated Node (createNode / temp):</div>
+          <div class="aux-boxes" id="stack-aux-container">
+            <!-- Dynamic Aux Node rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="playback-toolbar">
+          <div class="playback-controls">
+            <button id="btn-stack-prev-step" class="btn" title="Previous Step">&lt; Prev Step</button>
+            <button id="btn-stack-next-step" class="btn btn-primary" title="Next Step / Iteration">Next Iteration &gt;</button>
+            <button id="btn-stack-play-pause" class="btn">Auto Play</button>
+            <button id="btn-stack-reset-algo" class="btn btn-secondary">Reset Simulation</button>
+          </div>
+
+          <div class="speed-controls">
+            <label for="stack-speed-range">Speed:</label>
+            <input type="range" id="stack-speed-range" min="100" max="1500" value="600" step="50">
+            <span id="stack-speed-label">600ms</span>
+          </div>
+
+          <div class="step-indicator">
+            <span>Step: </span><strong id="stack-step-counter">0 / 0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Execution Log & C Syntax Code Box for Stack -->
+      <section class="panel">
+        <div class="panel-header">C Syntax Code &amp; Execution Log (Stack via Linked List)</div>
+        <div class="status-box" id="stack-status-box">
+          Select a function above and click Run to step through the execution.
+        </div>
+        <div class="code-box" id="stack-code-box">
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+typedef struct node* NodePtr;
+
+struct node {
+    int data;
+    NodePtr next;
+};
+
+typedef NodePtr Stack; // the stack is just a pointer to the top node
+
+Stack top = initialize();
+        </div>
+      </section>
+      </div>
+      <!-- End of ds-content-stack -->
+
+      <!-- Main Active Data Structure Content: Queue -->
+      <div id="ds-content-queue" class="ds-content-section hidden">
+      <!-- Queue Setup Panel -->
+      <section class="panel">
+        <div class="panel-header">Queue Setup (FIFO - Front to Rear)</div>
+        <div class="controls-row">
+          <div class="control-group">
+            <label for="queue-size">Length:</label>
+            <input type="number" id="queue-size" min="0" max="10" value="3">
+            <button id="btn-queue-resize" class="btn">Set Length</button>
+          </div>
+
+          <div class="control-group">
+            <button id="btn-queue-sample" class="btn btn-primary">main() Queue [10, 20, 30]</button>
+            <button id="btn-queue-randomize" class="btn">Randomize Values</button>
+            <button id="btn-queue-reset" class="btn btn-secondary">initialize() (front=NULL, rear=NULL)</button>
+          </div>
+
+          <div class="control-group custom-input-group">
+            <label for="custom-queue-input">Custom Queue:</label>
+            <input type="text" id="custom-queue-input" placeholder="e.g. 10, 20, 30">
+            <button id="btn-queue-apply-custom" class="btn">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Queue Operations Panel -->
+      <section class="panel">
+        <div class="panel-header">Select Algorithm (Queue Operations - C Implementation)</div>
+        <div class="algo-tabs" id="queue-category-tabs">
+          <button class="tab-btn active" data-queuecategory="enqueue">enqueue()</button>
+          <button class="tab-btn" data-queuecategory="dequeue">dequeue()</button>
+          <button class="tab-btn" data-queuecategory="peek">peek()</button>
+          <button class="tab-btn" data-queuecategory="isEmpty">isEmpty()</button>
+          <button class="tab-btn" data-queuecategory="countNodes">countNodes()</button>
+          <button class="tab-btn" data-queuecategory="clear">clear()</button>
+        </div>
+
+        <div class="algo-sub-panel">
+          <!-- enqueue -->
+          <div class="algo-options" id="opt-queue-enqueue">
+            <div class="form-row">
+              <div class="control-group">
+                <label for="queue-enqueue-val">item (data to enqueue at rear):</label>
+                <input type="number" id="queue-enqueue-val" value="40">
+              </div>
+              <button id="btn-queue-start-enqueue" class="btn btn-action">Run enqueue(&amp;q, item)</button>
+            </div>
+          </div>
+
+          <!-- dequeue -->
+          <div class="algo-options hidden" id="opt-queue-dequeue">
+            <div class="form-row">
+              <span class="info-text">Dequeues node at <code>front</code>, stores value in <code>*item</code>, and updates <code>q-&gt;front = q-&gt;front-&gt;next</code>.</span>
+              <button id="btn-queue-start-dequeue" class="btn btn-action">Run dequeue(&amp;q, &amp;value)</button>
+            </div>
+          </div>
+
+          <!-- peek -->
+          <div class="algo-options hidden" id="opt-queue-peek">
+            <div class="form-row">
+              <span class="info-text">Inspects the front element without removing it (<code>*item = q-&gt;front-&gt;data</code>).</span>
+              <button id="btn-queue-start-peek" class="btn btn-action">Run peek(&amp;q, &amp;value)</button>
+            </div>
+          </div>
+
+          <!-- isEmpty -->
+          <div class="algo-options hidden" id="opt-queue-isEmpty">
+            <div class="form-row">
+              <span class="info-text">Checks if the queue is empty (<code>q-&gt;front == NULL</code>). Returns 1 if empty, 0 otherwise.</span>
+              <button id="btn-queue-start-isEmpty" class="btn btn-action">Run isEmpty(&amp;q)</button>
+            </div>
+          </div>
+
+          <!-- countNodes -->
+          <div class="algo-options hidden" id="opt-queue-countNodes">
+            <div class="form-row">
+              <span class="info-text">Traverses from <code>q-&gt;front</code> to <code>NULL</code> and counts total nodes using <code>countNodes(&amp;q)</code>.</span>
+              <button id="btn-queue-start-countNodes" class="btn btn-action">Run countNodes(&amp;q)</button>
+            </div>
+          </div>
+
+          <!-- clear -->
+          <div class="algo-options hidden" id="opt-queue-clear">
+            <div class="form-row">
+              <span class="info-text">Repeatedly calls <code>dequeue(&amp;q, NULL)</code> until queue is empty.</span>
+              <button id="btn-queue-start-clear" class="btn btn-action">Run clear(&amp;q)</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Queue Visualizer Stage -->
+      <section class="panel visualizer-section">
+        <div class="panel-header">Queue Visualization (FIFO - Front to Rear)</div>
+
+        <!-- Legend -->
+        <div class="visualizer-legend">
+          <span class="legend-item"><span class="legend-box default"></span> Node</span>
+          <span class="legend-item"><span class="legend-box current"></span> current</span>
+          <span class="legend-item"><span class="legend-box target"></span> front</span>
+          <span class="legend-item"><span class="legend-box shifted"></span> rear / temp</span>
+          <span class="legend-item"><span class="legend-box success"></span> newNode / Peek</span>
+          <span class="legend-item"><span class="legend-box eliminated"></span> Dequeued / Freed</span>
+        </div>
+
+        <!-- Main Queue Chain Container -->
+        <div class="ll-stage">
+          <div class="ll-chain-wrapper" id="queue-chain-container">
+            <!-- Dynamic Queue Nodes rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Auxiliary / Newly Allocated Node Stage -->
+        <div class="aux-stage" id="queue-aux-stage" style="display: none;">
+          <div class="aux-title" id="queue-aux-title">Allocated Node (createNode / temp):</div>
+          <div class="aux-boxes" id="queue-aux-container">
+            <!-- Dynamic Aux Node rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="playback-toolbar">
+          <div class="playback-controls">
+            <button id="btn-queue-prev-step" class="btn" title="Previous Step">&lt; Prev Step</button>
+            <button id="btn-queue-next-step" class="btn btn-primary" title="Next Step / Iteration">Next Iteration &gt;</button>
+            <button id="btn-queue-play-pause" class="btn">Auto Play</button>
+            <button id="btn-queue-reset-algo" class="btn btn-secondary">Reset Simulation</button>
+          </div>
+
+          <div class="speed-controls">
+            <label for="queue-speed-range">Speed:</label>
+            <input type="range" id="queue-speed-range" min="100" max="1500" value="600" step="50">
+            <span id="queue-speed-label">600ms</span>
+          </div>
+
+          <div class="step-indicator">
+            <span>Step: </span><strong id="queue-step-counter">0 / 0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Execution Log & C Syntax Code Box for Queue -->
+      <section class="panel">
+        <div class="panel-header">C Syntax Code &amp; Execution Log (Queue via Linked List)</div>
+        <div class="status-box" id="queue-status-box">
+          Select a function above and click Run to step through the execution.
+        </div>
+        <div class="code-box" id="queue-code-box">
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+typedef struct node* NodePtr;
+
+struct node {
+    int data;
+    NodePtr next;
+};
+
+typedef struct {
+    NodePtr front; // dequeue from here
+    NodePtr rear;  // enqueue at here
+} Queue;
+
+Queue q = initialize();
+        </div>
+      </section>
+      </div>
+      <!-- End of ds-content-queue -->
     </main>
   </div>
 
-  <script src="app.js?v=2.0"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>

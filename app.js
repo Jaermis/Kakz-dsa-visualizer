@@ -53,41 +53,51 @@ function init() {
 function setupEventListeners() {
   // Top-Level Data Structure Navigation Tabs
   const dsButtons = document.querySelectorAll(".ds-nav-btn");
-  const arraySection = document.getElementById("ds-content-array");
-  const llSection = document.getElementById("ds-content-linkedlist");
+  const dsSections = {
+    array: document.getElementById("ds-content-array"),
+    linkedlist: document.getElementById("ds-content-linkedlist"),
+    stack: document.getElementById("ds-content-stack"),
+    queue: document.getElementById("ds-content-queue")
+  };
 
   dsButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       const ds = btn.dataset.ds;
       if (btn.classList.contains("disabled")) {
         const titleName = btn.textContent.trim().replace("Soon", "").trim();
-        statusBox.textContent = `The ${titleName} visualizer module is planned for a future update.`;
-        if (llStatusBox) llStatusBox.textContent = `The ${titleName} visualizer module is planned for a future update.`;
+        const msg = `The ${titleName} visualizer module is planned for a future update.`;
+        if (statusBox) statusBox.textContent = msg;
+        if (typeof llStatusBox !== "undefined" && llStatusBox) llStatusBox.textContent = msg;
+        if (typeof stackStatusBox !== "undefined" && stackStatusBox) stackStatusBox.textContent = msg;
+        if (typeof queueStatusBox !== "undefined" && queueStatusBox) queueStatusBox.textContent = msg;
       } else {
         dsButtons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
 
-        if (ds === "array") {
-          if (arraySection) {
-            arraySection.classList.remove("hidden");
-            arraySection.style.display = "flex";
+        pausePlayback();
+        if (typeof pauseLLPlayback === "function") pauseLLPlayback();
+        if (typeof pauseStackPlayback === "function") pauseStackPlayback();
+        if (typeof pauseQueuePlayback === "function") pauseQueuePlayback();
+
+        Object.keys(dsSections).forEach(key => {
+          const sec = dsSections[key];
+          if (sec) {
+            if (key === ds) {
+              sec.classList.remove("hidden");
+              sec.style.display = "flex";
+            } else {
+              sec.classList.add("hidden");
+              sec.style.display = "none";
+            }
           }
-          if (llSection) {
-            llSection.classList.add("hidden");
-            llSection.style.display = "none";
-          }
-          pauseLLPlayback();
-        } else if (ds === "linkedlist") {
-          if (arraySection) {
-            arraySection.classList.add("hidden");
-            arraySection.style.display = "none";
-          }
-          if (llSection) {
-            llSection.classList.remove("hidden");
-            llSection.style.display = "flex";
-          }
-          pausePlayback();
+        });
+
+        if (ds === "linkedlist" && typeof renderLinkedListInitial === "function") {
           renderLinkedListInitial();
+        } else if (ds === "stack" && typeof renderStackInitial === "function") {
+          renderStackInitial();
+        } else if (ds === "queue" && typeof renderQueueInitial === "function") {
+          renderQueueInitial();
         }
       }
     });
@@ -2163,8 +2173,1605 @@ function generateLLCountNodesSteps() {
   setLLSimulationSteps(genSteps);
 }
 
+// ==========================================================================
+// Stack Visualizer Engine (Singly Linked List Implementation - LIFO)
+// ==========================================================================
+
+let currentStack = [30, 20, 10]; // Matches main(): push(10), push(20), push(30) -> top is 30
+let stackSteps = [];
+let stackCurrentStepIndex = 0;
+let stackIsPlaying = false;
+let stackPlayInterval = null;
+let stackPlaySpeed = 600;
+
+// DOM Elements - Stack
+let stackChainContainer;
+let stackAuxStage;
+let stackAuxContainer;
+let stackAuxTitle;
+let stackStatusBox;
+let stackCodeBox;
+let stackStepCounter;
+let stackSpeedRange;
+let stackSpeedLabel;
+
+// Buttons - Stack
+let btnStackPrevStep;
+let btnStackNextStep;
+let btnStackPlayPause;
+let btnStackResetAlgo;
+let btnStackSample;
+let btnStackRandomize;
+let btnStackReset;
+let btnStackResize;
+let btnStackApplyCustom;
+
+// Inputs - Stack
+let inputStackSize;
+let inputStackCustom;
+let inputStackPushVal;
+
+function initStackVisualizer() {
+  stackChainContainer = document.getElementById("stack-chain-container");
+  stackAuxStage = document.getElementById("stack-aux-stage");
+  stackAuxContainer = document.getElementById("stack-aux-container");
+  stackAuxTitle = document.getElementById("stack-aux-title");
+  stackStatusBox = document.getElementById("stack-status-box");
+  stackCodeBox = document.getElementById("stack-code-box");
+  stackStepCounter = document.getElementById("stack-step-counter");
+  stackSpeedRange = document.getElementById("stack-speed-range");
+  stackSpeedLabel = document.getElementById("stack-speed-label");
+
+  btnStackPrevStep = document.getElementById("btn-stack-prev-step");
+  btnStackNextStep = document.getElementById("btn-stack-next-step");
+  btnStackPlayPause = document.getElementById("btn-stack-play-pause");
+  btnStackResetAlgo = document.getElementById("btn-stack-reset-algo");
+  btnStackSample = document.getElementById("btn-stack-sample");
+  btnStackRandomize = document.getElementById("btn-stack-randomize");
+  btnStackReset = document.getElementById("btn-stack-reset");
+  btnStackResize = document.getElementById("btn-stack-resize");
+  btnStackApplyCustom = document.getElementById("btn-stack-apply-custom");
+
+  inputStackSize = document.getElementById("stack-size");
+  inputStackCustom = document.getElementById("custom-stack-input");
+  inputStackPushVal = document.getElementById("stack-push-val");
+
+  setupStackEventListeners();
+  renderStackInitial();
+}
+
+function setupStackEventListeners() {
+  // Sub-tabs for Stack
+  const tabButtons = document.querySelectorAll("#stack-category-tabs .tab-btn");
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const category = btn.dataset.stackcategory;
+      document.querySelectorAll("#ds-content-stack .algo-options").forEach(opt => opt.classList.add("hidden"));
+      const activeOpt = document.getElementById(`opt-stack-${category}`);
+      if (activeOpt) activeOpt.classList.remove("hidden");
+    });
+  });
+
+  // Setup buttons
+  if (btnStackSample) btnStackSample.addEventListener("click", () => {
+    pauseStackPlayback();
+    currentStack = [30, 20, 10];
+    if (inputStackSize) inputStackSize.value = 3;
+    clearStackSimulation();
+    renderStackInitial();
+  });
+
+  if (btnStackRandomize) btnStackRandomize.addEventListener("click", () => {
+    pauseStackPlayback();
+    const len = currentStack.length > 0 ? currentStack.length : 3;
+    currentStack = Array.from({ length: len }, () => Math.floor(Math.random() * 90) + 10);
+    clearStackSimulation();
+    renderStackInitial();
+  });
+
+  if (btnStackReset) btnStackReset.addEventListener("click", () => {
+    pauseStackPlayback();
+    currentStack = [];
+    if (inputStackSize) inputStackSize.value = 0;
+    clearStackSimulation();
+    renderStackInitial();
+  });
+
+  if (btnStackResize) btnStackResize.addEventListener("click", () => {
+    pauseStackPlayback();
+    let n = parseInt(inputStackSize.value);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 10) n = 10;
+    inputStackSize.value = n;
+    while (currentStack.length < n) {
+      currentStack.push(Math.floor(Math.random() * 90) + 10);
+    }
+    if (currentStack.length > n) {
+      currentStack = currentStack.slice(0, n);
+    }
+    clearStackSimulation();
+    renderStackInitial();
+  });
+
+  if (btnStackApplyCustom) btnStackApplyCustom.addEventListener("click", () => {
+    pauseStackPlayback();
+    const raw = inputStackCustom.value.trim();
+    if (!raw) return;
+    const parts = raw.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+    if (parts.length > 10) {
+      alert("Please provide at most 10 comma-separated numbers.");
+      return;
+    }
+    currentStack = parts;
+    if (inputStackSize) inputStackSize.value = parts.length;
+    clearStackSimulation();
+    renderStackInitial();
+  });
+
+  // Action Buttons
+  const btnStartPush = document.getElementById("btn-stack-start-push");
+  if (btnStartPush) btnStartPush.addEventListener("click", () => {
+    let item = parseInt(inputStackPushVal.value);
+    if (isNaN(item)) item = 40;
+    if (currentStack.length >= 10) {
+      alert("Maximum stack display limit is 10 nodes.");
+      return;
+    }
+    generateStackPushSteps(item);
+  });
+
+  const btnStartPop = document.getElementById("btn-stack-start-pop");
+  if (btnStartPop) btnStartPop.addEventListener("click", generateStackPopSteps);
+
+  const btnStartPeek = document.getElementById("btn-stack-start-peek");
+  if (btnStartPeek) btnStartPeek.addEventListener("click", generateStackPeekSteps);
+
+  const btnStartIsEmpty = document.getElementById("btn-stack-start-isEmpty");
+  if (btnStartIsEmpty) btnStartIsEmpty.addEventListener("click", generateStackIsEmptySteps);
+
+  const btnStartCountNodes = document.getElementById("btn-stack-start-countNodes");
+  if (btnStartCountNodes) btnStartCountNodes.addEventListener("click", generateStackCountNodesSteps);
+
+  const btnStartClear = document.getElementById("btn-stack-start-clear");
+  if (btnStartClear) btnStartClear.addEventListener("click", generateStackClearSteps);
+
+  // Playback Buttons
+  if (btnStackNextStep) btnStackNextStep.addEventListener("click", stepStackForward);
+  if (btnStackPrevStep) btnStackPrevStep.addEventListener("click", stepStackBackward);
+  if (btnStackPlayPause) btnStackPlayPause.addEventListener("click", toggleStackPlayPause);
+  if (btnStackResetAlgo) btnStackResetAlgo.addEventListener("click", resetStackSimulation);
+
+  if (stackSpeedRange) {
+    stackSpeedRange.addEventListener("input", (e) => {
+      stackPlaySpeed = parseInt(e.target.value);
+      if (stackSpeedLabel) stackSpeedLabel.textContent = `${stackPlaySpeed}ms`;
+      if (stackIsPlaying) {
+        clearInterval(stackPlayInterval);
+        stackPlayInterval = setInterval(stepStackForward, stackPlaySpeed);
+      }
+    });
+  }
+}
+
+function getStackBadgeClass(name) {
+  const lower = name.toLowerCase();
+  if (lower.includes("top")) return "ptr-top";
+  if (lower.includes("temp")) return "ptr-temp";
+  if (lower.includes("new")) return "ptr-newnode";
+  if (lower.includes("curr")) return "ptr-current";
+  if (lower.includes("count")) return "ptr-count";
+  return `ptr-${lower.replace(/[^a-z0-9]/g, "")}`;
+}
+
+function createStackStep({ nodes, pointers = {}, auxNode = null, status = "", code = "" }) {
+  return {
+    nodes: nodes ? JSON.parse(JSON.stringify(nodes)) : [],
+    pointers: JSON.parse(JSON.stringify(pointers)),
+    auxNode: auxNode ? JSON.parse(JSON.stringify(auxNode)) : null,
+    status,
+    code
+  };
+}
+
+function renderStackInitial() {
+  const nodes = currentStack.map(val => ({
+    value: val,
+    state: "default",
+    arrow: "right"
+  }));
+
+  const pointers = {};
+  if (currentStack.length > 0) {
+    pointers[0] = ["top"];
+  }
+
+  renderStackState({
+    nodes,
+    pointers,
+    auxNode: null,
+    status: `Stack initialized with ${currentStack.length} nodes (top: ${currentStack.length > 0 ? currentStack[0] : "NULL"}). Choose an operation and click Run to begin.`,
+    code: `/* Singly Linked Stack in C */\ntypedef struct node* NodePtr;\n\nstruct node {\n    int data;\n    NodePtr next;\n};\n\ntypedef NodePtr Stack; // the stack is just a pointer to the top node\n\nStack top = initialize();\n// ${currentStack.length > 0 ? `top -> ${currentStack.join(" -> ")} -> NULL` : "top -> NULL"}`
+  });
+  updateStackPlaybackControls();
+}
+
+function renderStackState(step) {
+  if (!step || !stackChainContainer) return;
+
+  const { nodes = [], pointers = {}, auxNode = null, status = "", code = "" } = step;
+  stackChainContainer.innerHTML = "";
+
+  if (nodes.length === 0) {
+    const emptyWrapper = document.createElement("div");
+    emptyWrapper.className = "ll-node-wrapper";
+
+    const topCol = document.createElement("div");
+    topCol.className = "ll-node-col";
+    const ptrBox = document.createElement("div");
+    ptrBox.className = "pointers-container";
+    const badge = document.createElement("span");
+    badge.className = "pointer-badge ptr-top";
+    badge.textContent = "top";
+    ptrBox.appendChild(badge);
+    topCol.appendChild(ptrBox);
+
+    const arrow = document.createElement("div");
+    arrow.className = "ll-arrow";
+    arrow.textContent = "──▶";
+
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL";
+    nullCol.appendChild(nullBox);
+
+    emptyWrapper.appendChild(topCol);
+    emptyWrapper.appendChild(arrow);
+    emptyWrapper.appendChild(nullCol);
+    stackChainContainer.appendChild(emptyWrapper);
+  } else {
+    nodes.forEach((node, idx) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "ll-node-wrapper";
+
+      const col = document.createElement("div");
+      col.className = "ll-node-col";
+
+      // Pointers above node
+      const ptrContainer = document.createElement("div");
+      ptrContainer.className = "pointers-container";
+      if (pointers[idx]) {
+        const ptrList = Array.isArray(pointers[idx]) ? pointers[idx] : [pointers[idx]];
+        ptrList.forEach(p => {
+          const badge = document.createElement("span");
+          badge.className = `pointer-badge ${getStackBadgeClass(p)}`;
+          badge.textContent = p;
+          ptrContainer.appendChild(badge);
+        });
+      }
+      col.appendChild(ptrContainer);
+
+      // Node box: [ data | next ]
+      const nodeBox = document.createElement("div");
+      nodeBox.className = `ll-node state-${node.state || "default"}`;
+
+      const dataBox = document.createElement("div");
+      dataBox.className = "ll-data";
+      dataBox.textContent = node.value !== undefined && node.value !== null ? node.value : "";
+      nodeBox.appendChild(dataBox);
+
+      const nextBox = document.createElement("div");
+      nextBox.className = "ll-next";
+      nextBox.textContent = "•";
+      nodeBox.appendChild(nextBox);
+
+      col.appendChild(nodeBox);
+
+      // Index label (top is [0])
+      const idxLabel = document.createElement("span");
+      idxLabel.className = "index-label";
+      idxLabel.textContent = idx === 0 ? "[0] (top)" : `[${idx}]`;
+      col.appendChild(idxLabel);
+
+      wrapper.appendChild(col);
+
+      // Arrow connector
+      if (node.arrow !== "none") {
+        const arrow = document.createElement("div");
+        arrow.className = "ll-arrow";
+        arrow.textContent = "──▶";
+        wrapper.appendChild(arrow);
+      }
+
+      stackChainContainer.appendChild(wrapper);
+    });
+
+    // Terminal NULL Box
+    const nullWrapper = document.createElement("div");
+    nullWrapper.className = "ll-node-wrapper";
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+
+    const nullPtr = document.createElement("div");
+    nullPtr.className = "pointers-container";
+    if (pointers["null"]) {
+      const ptrList = Array.isArray(pointers["null"]) ? pointers["null"] : [pointers["null"]];
+      ptrList.forEach(p => {
+        const badge = document.createElement("span");
+        badge.className = `pointer-badge ${getStackBadgeClass(p)}`;
+        badge.textContent = p;
+        nullPtr.appendChild(badge);
+      });
+    }
+    nullCol.appendChild(nullPtr);
+
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL";
+    nullCol.appendChild(nullBox);
+
+    nullWrapper.appendChild(nullCol);
+    stackChainContainer.appendChild(nullWrapper);
+  }
+
+  // Aux stage
+  if (auxNode && auxNode.value !== undefined) {
+    stackAuxStage.style.display = "flex";
+    stackAuxTitle.textContent = auxNode.title || "Allocated Node (createNode / temp):";
+    stackAuxContainer.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "ll-node-col";
+
+    const auxPtr = document.createElement("div");
+    auxPtr.className = "pointers-container";
+    if (auxNode.label) {
+      const badge = document.createElement("span");
+      badge.className = `pointer-badge ${getStackBadgeClass(auxNode.label)}`;
+      badge.textContent = auxNode.label;
+      auxPtr.appendChild(badge);
+    }
+    wrap.appendChild(auxPtr);
+
+    const auxNodeBox = document.createElement("div");
+    auxNodeBox.className = `ll-node state-${auxNode.state || "success"}`;
+
+    const dataBox = document.createElement("div");
+    dataBox.className = "ll-data";
+    dataBox.textContent = auxNode.value;
+    auxNodeBox.appendChild(dataBox);
+
+    const nextBox = document.createElement("div");
+    nextBox.className = "ll-next";
+    nextBox.textContent = auxNode.nextDesc || "NULL";
+    auxNodeBox.appendChild(nextBox);
+
+    wrap.appendChild(auxNodeBox);
+    stackAuxContainer.appendChild(wrap);
+  } else {
+    stackAuxStage.style.display = "none";
+  }
+
+  if (stackStatusBox) stackStatusBox.textContent = status;
+  if (stackCodeBox && code) stackCodeBox.textContent = code;
+}
+
+function setStackSimulationSteps(generatedSteps) {
+  pauseStackPlayback();
+  stackSteps = generatedSteps;
+  stackCurrentStepIndex = 0;
+  if (stackSteps.length > 0) {
+    renderStackState(stackSteps[0]);
+  }
+  updateStackPlaybackControls();
+}
+
+function clearStackSimulation() {
+  stackSteps = [];
+  stackCurrentStepIndex = 0;
+  updateStackPlaybackControls();
+}
+
+function stepStackForward() {
+  if (stackCurrentStepIndex < stackSteps.length - 1) {
+    stackCurrentStepIndex++;
+    renderStackState(stackSteps[stackCurrentStepIndex]);
+    updateStackPlaybackControls();
+  } else {
+    pauseStackPlayback();
+  }
+}
+
+function stepStackBackward() {
+  if (stackCurrentStepIndex > 0) {
+    stackCurrentStepIndex--;
+    renderStackState(stackSteps[stackCurrentStepIndex]);
+    updateStackPlaybackControls();
+  }
+}
+
+function toggleStackPlayPause() {
+  if (stackIsPlaying) {
+    pauseStackPlayback();
+  } else {
+    if (stackSteps.length === 0) return;
+    if (stackCurrentStepIndex >= stackSteps.length - 1) {
+      stackCurrentStepIndex = 0;
+      renderStackState(stackSteps[0]);
+    }
+    stackIsPlaying = true;
+    if (btnStackPlayPause) {
+      btnStackPlayPause.textContent = "Pause";
+      btnStackPlayPause.classList.add("btn-primary");
+    }
+    stackPlayInterval = setInterval(stepStackForward, stackPlaySpeed);
+  }
+}
+
+function pauseStackPlayback() {
+  stackIsPlaying = false;
+  clearInterval(stackPlayInterval);
+  if (btnStackPlayPause) {
+    btnStackPlayPause.textContent = "Auto Play";
+    btnStackPlayPause.classList.remove("btn-primary");
+  }
+}
+
+function resetStackSimulation() {
+  pauseStackPlayback();
+  if (stackSteps.length > 0) {
+    stackCurrentStepIndex = 0;
+    renderStackState(stackSteps[0]);
+    updateStackPlaybackControls();
+  }
+}
+
+function updateStackPlaybackControls() {
+  if (!btnStackPrevStep) return;
+  const total = stackSteps.length;
+  const current = total > 0 ? stackCurrentStepIndex + 1 : 0;
+  if (stackStepCounter) stackStepCounter.textContent = `${current} / ${total}`;
+
+  btnStackPrevStep.disabled = total === 0 || stackCurrentStepIndex === 0;
+  btnStackNextStep.disabled = total === 0 || stackCurrentStepIndex >= total - 1;
+  btnStackPlayPause.disabled = total === 0;
+  btnStackResetAlgo.disabled = total === 0;
+}
+
+// --- Stack Algorithms (C Parity) ---
+
+function generateStackPushSteps(item) {
+  const orig = [...currentStack];
+  const genSteps = [];
+
+  // Step 1: createNode(item)
+  const baseNodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+  genSteps.push(createStackStep({
+    nodes: baseNodes,
+    pointers: orig.length > 0 ? { 0: ["top"] } : { null: ["top=NULL"] },
+    auxNode: {
+      label: "newNode",
+      value: item,
+      nextDesc: "NULL",
+      state: "success",
+      title: "createNode(item) - Allocating Heap Memory:"
+    },
+    status: `push(top, ${item}): Allocating newNode in memory via createNode(${item}). newNode->data = ${item}; newNode->next = NULL;`,
+    code: `NodePtr newNode = createNode(item);\nnewNode->data = ${item};\nnewNode->next = NULL;`
+  }));
+
+  // Step 2: newNode->next = top;
+  genSteps.push(createStackStep({
+    nodes: baseNodes,
+    pointers: orig.length > 0 ? { 0: ["top"] } : { null: ["top=NULL"] },
+    auxNode: {
+      label: "newNode",
+      value: item,
+      nextDesc: orig.length > 0 ? "top" : "NULL",
+      state: "shifted",
+      title: "newNode->next = top - Linking Pointer:"
+    },
+    status: `newNode->next = top; Connecting newNode to current top (${orig.length > 0 ? orig[0] : "NULL"}).`,
+    code: `newNode->next = top; // newNode points to old top`
+  }));
+
+  // Step 3: return newNode;
+  const newStack = [item, ...orig];
+  const finalNodes = newStack.map((v, idx) => ({
+    value: v,
+    state: idx === 0 ? "success" : "default",
+    arrow: "right"
+  }));
+
+  genSteps.push(createStackStep({
+    nodes: finalNodes,
+    pointers: { 0: ["top", "newNode"] },
+    auxNode: null,
+    status: `return newNode; New node is the new top! Stack size is now ${newStack.length}.`,
+    code: `return newNode; // new node is the new top`
+  }));
+
+  currentStack = newStack;
+  if (inputStackSize) inputStackSize.value = newStack.length;
+  setStackSimulationSteps(genSteps);
+}
+
+function generateStackPopSteps() {
+  const orig = [...currentStack];
+  const genSteps = [];
+
+  if (orig.length === 0) {
+    genSteps.push(createStackStep({
+      nodes: [],
+      pointers: { null: ["top=NULL"] },
+      status: `Stack underflow! isEmpty(top) == 1. Nothing to pop. return top;`,
+      code: `if (isEmpty(top)) {\n    printf("Stack underflow! Nothing to pop.\\n");\n    return top;\n}`
+    }));
+    setStackSimulationSteps(genSteps);
+    return;
+  }
+
+  const poppedVal = orig[0];
+
+  // Step 1: NodePtr temp = top;
+  const step1Nodes = orig.map((v, idx) => ({
+    value: v,
+    state: idx === 0 ? "target" : "default",
+    arrow: "right"
+  }));
+  genSteps.push(createStackStep({
+    nodes: step1Nodes,
+    pointers: { 0: ["top", "temp"] },
+    status: `NodePtr temp = top; Saving pointer to current top node (data = ${poppedVal}).`,
+    code: `NodePtr temp = top;\nif (item != NULL) {\n    *item = temp->data; // *item = ${poppedVal}\n}`
+  }));
+
+  // Step 2: top = top->next;
+  const step2Nodes = orig.map((v, idx) => ({
+    value: v,
+    state: idx === 0 ? "eliminated" : (idx === 1 ? "current" : "default"),
+    arrow: idx === 0 ? "broken" : "right"
+  }));
+  const step2Pointers = { 0: ["temp"] };
+  if (orig.length > 1) {
+    step2Pointers[1] = ["top"];
+  } else {
+    step2Pointers["null"] = ["top=NULL"];
+  }
+
+  genSteps.push(createStackStep({
+    nodes: step2Nodes,
+    pointers: step2Pointers,
+    status: `top = top->next; top pointer advances to next node (${orig.length > 1 ? orig[1] : "NULL"}).`,
+    code: `top = top->next;`
+  }));
+
+  // Step 3: free(temp); return top;
+  const newStack = orig.slice(1);
+  const finalNodes = newStack.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const finalPointers = {};
+  if (newStack.length > 0) {
+    finalPointers[0] = ["top"];
+  } else {
+    finalPointers["null"] = ["top=NULL"];
+  }
+
+  genSteps.push(createStackStep({
+    nodes: finalNodes,
+    pointers: finalPointers,
+    auxNode: null,
+    status: `free(temp); Deallocated memory for popped node. Popped value = ${poppedVal}. return top;`,
+    code: `free(temp);\nreturn top; // Popped: ${poppedVal}`
+  }));
+
+  currentStack = newStack;
+  if (inputStackSize) inputStackSize.value = newStack.length;
+  setStackSimulationSteps(genSteps);
+}
+
+function generateStackPeekSteps() {
+  const orig = [...currentStack];
+  const genSteps = [];
+
+  if (orig.length === 0) {
+    genSteps.push(createStackStep({
+      nodes: [],
+      pointers: { null: ["top=NULL"] },
+      status: `isEmpty(top) == 1. Stack is empty! peek(top, &item) returns 0.`,
+      code: `if (isEmpty(top)) {\n    return 0;\n}`
+    }));
+  } else {
+    const val = orig[0];
+    const nodes = orig.map((v, idx) => ({
+      value: v,
+      state: idx === 0 ? "success" : "default",
+      arrow: "right"
+    }));
+
+    genSteps.push(createStackStep({
+      nodes,
+      pointers: { 0: ["top", "*item"] },
+      status: `peek(top, &item): Top node inspected without removing. *item = ${val}. return 1 (success);`,
+      code: `if (isEmpty(top)) {\n    return 0;\n}\n*item = top->data; // *item = ${val}\nreturn 1;`
+    }));
+  }
+
+  setStackSimulationSteps(genSteps);
+}
+
+function generateStackIsEmptySteps() {
+  const orig = [...currentStack];
+  const genSteps = [];
+  const empty = orig.length === 0;
+
+  const nodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const pointers = orig.length > 0 ? { 0: ["top"] } : { null: ["top=NULL"] };
+
+  genSteps.push(createStackStep({
+    nodes,
+    pointers,
+    status: `isEmpty(top): Checking top == NULL. Result: ${empty ? "1 (true - Stack is empty)" : "0 (false - Stack has items)"}.`,
+    code: `int isEmpty(Stack top) {\n    return top == NULL; // Evaluates to: ${empty ? "1 (EMPTY)" : "0 (NOT EMPTY)"}\n}`
+  }));
+
+  setStackSimulationSteps(genSteps);
+}
+
+function generateStackCountNodesSteps() {
+  const orig = [...currentStack];
+  const n = orig.length;
+  const genSteps = [];
+
+  const baseNodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+
+  genSteps.push(createStackStep({
+    nodes: baseNodes,
+    pointers: n > 0 ? { 0: ["top", "current"] } : { null: ["top=NULL", "current=NULL"] },
+    status: `countNodes(top): Initializing int count = 0; NodePtr current = top;`,
+    code: `int countNodes(Stack top) {\n    int count = 0;\n    NodePtr current = top;\n\n    while (current != NULL) {\n        count++;\n        current = current->next;\n    }\n    return count;\n}`
+  }));
+
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    count++;
+    const stepNodes = orig.map((v, idx) => ({
+      value: v,
+      state: idx === i ? "current" : (idx < i ? "success" : "default"),
+      arrow: "right"
+    }));
+
+    const pointers = { [i]: ["current", `count=${count}`] };
+    if (!pointers[0]) pointers[0] = [];
+    if (!pointers[0].includes("top")) pointers[0].unshift("top");
+
+    genSteps.push(createStackStep({
+      nodes: stepNodes,
+      pointers,
+      status: `while (current != NULL): At node [${i}] (${orig[i]}). count++ (count = ${count}). current = current->next;`,
+      code: `count++; // count = ${count}\ncurrent = current->next;`
+    }));
+  }
+
+  const finalNodes = orig.map(v => ({ value: v, state: "success", arrow: "right" }));
+  genSteps.push(createStackStep({
+    nodes: finalNodes,
+    pointers: n > 0 ? { 0: ["top"], null: ["current=NULL"] } : { null: ["current=NULL"] },
+    status: `current == NULL: Loop finished. Total count = ${count}. return count;`,
+    code: `return count; // Total nodes: ${count}`
+  }));
+
+  setStackSimulationSteps(genSteps);
+}
+
+function generateStackClearSteps() {
+  let list = [...currentStack];
+  const genSteps = [];
+
+  if (list.length === 0) {
+    genSteps.push(createStackStep({
+      nodes: [],
+      pointers: { null: ["top=NULL"] },
+      status: `clear(top): Stack is already empty (top == NULL).`,
+      code: `Stack clear(Stack top) {\n    while (top != NULL) {\n        top = pop(top, NULL);\n    }\n    return top;\n}`
+    }));
+    setStackSimulationSteps(genSteps);
+    return;
+  }
+
+  genSteps.push(createStackStep({
+    nodes: list.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: { 0: ["top"] },
+    status: `clear(top): Starting loop while (top != NULL) to pop and free every node.`,
+    code: `Stack clear(Stack top) {\n    while (top != NULL) {\n        top = pop(top, NULL);\n    }\n    return top;\n}`
+  }));
+
+  while (list.length > 0) {
+    const val = list[0];
+    genSteps.push(createStackStep({
+      nodes: list.map((v, idx) => ({ value: v, state: idx === 0 ? "target" : "default", arrow: "right" })),
+      pointers: { 0: ["top", "temp"] },
+      status: `top = pop(top, NULL): Freeing top node (${val}).`,
+      code: `top = pop(top, NULL); // Freeing ${val}`
+    }));
+
+    list = list.slice(1);
+
+    genSteps.push(createStackStep({
+      nodes: list.map(v => ({ value: v, state: "default", arrow: "right" })),
+      pointers: list.length > 0 ? { 0: ["top"] } : { null: ["top=NULL"] },
+      status: `Popped ${val}. ${list.length > 0 ? `Next top is ${list[0]}.` : "Stack is now empty (top == NULL)."}` ,
+      code: `// Stack remaining: ${list.length} nodes`
+    }));
+  }
+
+  currentStack = [];
+  if (inputStackSize) inputStackSize.value = 0;
+  setStackSimulationSteps(genSteps);
+}
+
+// ==========================================================================
+// Queue Visualizer Engine (Singly Linked List with front & rear - FIFO)
+// ==========================================================================
+
+let currentQueue = [10, 20, 30]; // Matches main(): enqueue(10), enqueue(20), enqueue(30) -> front is 10, rear is 30
+let queueSteps = [];
+let queueCurrentStepIndex = 0;
+let queueIsPlaying = false;
+let queuePlayInterval = null;
+let queuePlaySpeed = 600;
+
+// DOM Elements - Queue
+let queueChainContainer;
+let queueAuxStage;
+let queueAuxContainer;
+let queueAuxTitle;
+let queueStatusBox;
+let queueCodeBox;
+let queueStepCounter;
+let queueSpeedRange;
+let queueSpeedLabel;
+
+// Buttons - Queue
+let btnQueuePrevStep;
+let btnQueueNextStep;
+let btnQueuePlayPause;
+let btnQueueResetAlgo;
+let btnQueueSample;
+let btnQueueRandomize;
+let btnQueueReset;
+let btnQueueResize;
+let btnQueueApplyCustom;
+
+// Inputs - Queue
+let inputQueueSize;
+let inputQueueCustom;
+let inputQueueEnqueueVal;
+
+function initQueueVisualizer() {
+  queueChainContainer = document.getElementById("queue-chain-container");
+  queueAuxStage = document.getElementById("queue-aux-stage");
+  queueAuxContainer = document.getElementById("queue-aux-container");
+  queueAuxTitle = document.getElementById("queue-aux-title");
+  queueStatusBox = document.getElementById("queue-status-box");
+  queueCodeBox = document.getElementById("queue-code-box");
+  queueStepCounter = document.getElementById("queue-step-counter");
+  queueSpeedRange = document.getElementById("queue-speed-range");
+  queueSpeedLabel = document.getElementById("queue-speed-label");
+
+  btnQueuePrevStep = document.getElementById("btn-queue-prev-step");
+  btnQueueNextStep = document.getElementById("btn-queue-next-step");
+  btnQueuePlayPause = document.getElementById("btn-queue-play-pause");
+  btnQueueResetAlgo = document.getElementById("btn-queue-reset-algo");
+  btnQueueSample = document.getElementById("btn-queue-sample");
+  btnQueueRandomize = document.getElementById("btn-queue-randomize");
+  btnQueueReset = document.getElementById("btn-queue-reset");
+  btnQueueResize = document.getElementById("btn-queue-resize");
+  btnQueueApplyCustom = document.getElementById("btn-queue-apply-custom");
+
+  inputQueueSize = document.getElementById("queue-size");
+  inputQueueCustom = document.getElementById("custom-queue-input");
+  inputQueueEnqueueVal = document.getElementById("queue-enqueue-val");
+
+  setupQueueEventListeners();
+  renderQueueInitial();
+}
+
+function setupQueueEventListeners() {
+  // Sub-tabs for Queue
+  const tabButtons = document.querySelectorAll("#queue-category-tabs .tab-btn");
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const category = btn.dataset.queuecategory;
+      document.querySelectorAll("#ds-content-queue .algo-options").forEach(opt => opt.classList.add("hidden"));
+      const activeOpt = document.getElementById(`opt-queue-${category}`);
+      if (activeOpt) activeOpt.classList.remove("hidden");
+    });
+  });
+
+  // Setup buttons
+  if (btnQueueSample) btnQueueSample.addEventListener("click", () => {
+    pauseQueuePlayback();
+    currentQueue = [10, 20, 30];
+    if (inputQueueSize) inputQueueSize.value = 3;
+    clearQueueSimulation();
+    renderQueueInitial();
+  });
+
+  if (btnQueueRandomize) btnQueueRandomize.addEventListener("click", () => {
+    pauseQueuePlayback();
+    const len = currentQueue.length > 0 ? currentQueue.length : 3;
+    currentQueue = Array.from({ length: len }, () => Math.floor(Math.random() * 90) + 10);
+    clearQueueSimulation();
+    renderQueueInitial();
+  });
+
+  if (btnQueueReset) btnQueueReset.addEventListener("click", () => {
+    pauseQueuePlayback();
+    currentQueue = [];
+    if (inputQueueSize) inputQueueSize.value = 0;
+    clearQueueSimulation();
+    renderQueueInitial();
+  });
+
+  if (btnQueueResize) btnQueueResize.addEventListener("click", () => {
+    pauseQueuePlayback();
+    let n = parseInt(inputQueueSize.value);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 10) n = 10;
+    inputQueueSize.value = n;
+    while (currentQueue.length < n) {
+      currentQueue.push(Math.floor(Math.random() * 90) + 10);
+    }
+    if (currentQueue.length > n) {
+      currentQueue = currentQueue.slice(0, n);
+    }
+    clearQueueSimulation();
+    renderQueueInitial();
+  });
+
+  if (btnQueueApplyCustom) btnQueueApplyCustom.addEventListener("click", () => {
+    pauseQueuePlayback();
+    const raw = inputQueueCustom.value.trim();
+    if (!raw) return;
+    const parts = raw.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+    if (parts.length > 10) {
+      alert("Please provide at most 10 comma-separated numbers.");
+      return;
+    }
+    currentQueue = parts;
+    if (inputQueueSize) inputQueueSize.value = parts.length;
+    clearQueueSimulation();
+    renderQueueInitial();
+  });
+
+  // Action Buttons
+  const btnStartEnqueue = document.getElementById("btn-queue-start-enqueue");
+  if (btnStartEnqueue) btnStartEnqueue.addEventListener("click", () => {
+    let item = parseInt(inputQueueEnqueueVal.value);
+    if (isNaN(item)) item = 40;
+    if (currentQueue.length >= 10) {
+      alert("Maximum queue display limit is 10 nodes.");
+      return;
+    }
+    generateQueueEnqueueSteps(item);
+  });
+
+  const btnStartDequeue = document.getElementById("btn-queue-start-dequeue");
+  if (btnStartDequeue) btnStartDequeue.addEventListener("click", generateQueueDequeueSteps);
+
+  const btnStartPeek = document.getElementById("btn-queue-start-peek");
+  if (btnStartPeek) btnStartPeek.addEventListener("click", generateQueuePeekSteps);
+
+  const btnStartIsEmpty = document.getElementById("btn-queue-start-isEmpty");
+  if (btnStartIsEmpty) btnStartIsEmpty.addEventListener("click", generateQueueIsEmptySteps);
+
+  const btnStartCountNodes = document.getElementById("btn-queue-start-countNodes");
+  if (btnStartCountNodes) btnStartCountNodes.addEventListener("click", generateQueueCountNodesSteps);
+
+  const btnStartClear = document.getElementById("btn-queue-start-clear");
+  if (btnStartClear) btnStartClear.addEventListener("click", generateQueueClearSteps);
+
+  // Playback Buttons
+  if (btnQueueNextStep) btnQueueNextStep.addEventListener("click", stepQueueForward);
+  if (btnQueuePrevStep) btnQueuePrevStep.addEventListener("click", stepQueueBackward);
+  if (btnQueuePlayPause) btnQueuePlayPause.addEventListener("click", toggleQueuePlayPause);
+  if (btnQueueResetAlgo) btnQueueResetAlgo.addEventListener("click", resetQueueSimulation);
+
+  if (queueSpeedRange) {
+    queueSpeedRange.addEventListener("input", (e) => {
+      queuePlaySpeed = parseInt(e.target.value);
+      if (queueSpeedLabel) queueSpeedLabel.textContent = `${queuePlaySpeed}ms`;
+      if (queueIsPlaying) {
+        clearInterval(queuePlayInterval);
+        queuePlayInterval = setInterval(stepQueueForward, queuePlaySpeed);
+      }
+    });
+  }
+}
+
+function getQueueBadgeClass(name) {
+  const lower = name.toLowerCase();
+  if (lower.includes("front")) return "ptr-front";
+  if (lower.includes("rear")) return "ptr-rear";
+  if (lower.includes("temp")) return "ptr-temp";
+  if (lower.includes("new")) return "ptr-newnode";
+  if (lower.includes("curr")) return "ptr-current";
+  if (lower.includes("count")) return "ptr-count";
+  return `ptr-${lower.replace(/[^a-z0-9]/g, "")}`;
+}
+
+function createQueueStep({ nodes, pointers = {}, auxNode = null, status = "", code = "" }) {
+  return {
+    nodes: nodes ? JSON.parse(JSON.stringify(nodes)) : [],
+    pointers: JSON.parse(JSON.stringify(pointers)),
+    auxNode: auxNode ? JSON.parse(JSON.stringify(auxNode)) : null,
+    status,
+    code
+  };
+}
+
+function renderQueueInitial() {
+  const nodes = currentQueue.map(val => ({
+    value: val,
+    state: "default",
+    arrow: "right"
+  }));
+
+  const pointers = {};
+  if (currentQueue.length === 1) {
+    pointers[0] = ["front", "rear"];
+  } else if (currentQueue.length > 1) {
+    pointers[0] = ["front"];
+    pointers[currentQueue.length - 1] = ["rear"];
+  }
+
+  renderQueueState({
+    nodes,
+    pointers,
+    auxNode: null,
+    status: `Queue initialized with ${currentQueue.length} nodes (front: ${currentQueue.length > 0 ? currentQueue[0] : "NULL"}, rear: ${currentQueue.length > 0 ? currentQueue[currentQueue.length - 1] : "NULL"}). Choose an operation and click Run to begin.`,
+    code: `/* Singly Linked Queue in C */\ntypedef struct node* NodePtr;\n\nstruct node {\n    int data;\n    NodePtr next;\n};\n\ntypedef struct {\n    NodePtr front; // dequeue from here\n    NodePtr rear;  // enqueue at here\n} Queue;\n\nQueue q = initialize();\n// ${currentQueue.length > 0 ? `FRONT -> ${currentQueue.join(" -> ")} -> NULL (rear)` : "FRONT (NULL) | REAR (NULL)"}`
+  });
+  updateQueuePlaybackControls();
+}
+
+function renderQueueState(step) {
+  if (!step || !queueChainContainer) return;
+
+  const { nodes = [], pointers = {}, auxNode = null, status = "", code = "" } = step;
+  queueChainContainer.innerHTML = "";
+
+  if (nodes.length === 0) {
+    const emptyWrapper = document.createElement("div");
+    emptyWrapper.className = "ll-node-wrapper";
+
+    const ptrCol = document.createElement("div");
+    ptrCol.className = "ll-node-col";
+    const ptrBox = document.createElement("div");
+    ptrBox.className = "pointers-container";
+
+    const badgeF = document.createElement("span");
+    badgeF.className = "pointer-badge ptr-front";
+    badgeF.textContent = "q.front";
+    ptrBox.appendChild(badgeF);
+
+    const badgeR = document.createElement("span");
+    badgeR.className = "pointer-badge ptr-rear";
+    badgeR.textContent = "q.rear";
+    ptrBox.appendChild(badgeR);
+
+    ptrCol.appendChild(ptrBox);
+
+    const arrow = document.createElement("div");
+    arrow.className = "ll-arrow";
+    arrow.textContent = "──▶";
+
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL";
+    nullCol.appendChild(nullBox);
+
+    emptyWrapper.appendChild(ptrCol);
+    emptyWrapper.appendChild(arrow);
+    emptyWrapper.appendChild(nullCol);
+    queueChainContainer.appendChild(emptyWrapper);
+  } else {
+    nodes.forEach((node, idx) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "ll-node-wrapper";
+
+      const col = document.createElement("div");
+      col.className = "ll-node-col";
+
+      // Pointers above node
+      const ptrContainer = document.createElement("div");
+      ptrContainer.className = "pointers-container";
+      if (pointers[idx]) {
+        const ptrList = Array.isArray(pointers[idx]) ? pointers[idx] : [pointers[idx]];
+        ptrList.forEach(p => {
+          const badge = document.createElement("span");
+          badge.className = `pointer-badge ${getQueueBadgeClass(p)}`;
+          badge.textContent = p;
+          ptrContainer.appendChild(badge);
+        });
+      }
+      col.appendChild(ptrContainer);
+
+      // Node box: [ data | next ]
+      const nodeBox = document.createElement("div");
+      nodeBox.className = `ll-node state-${node.state || "default"}`;
+
+      const dataBox = document.createElement("div");
+      dataBox.className = "ll-data";
+      dataBox.textContent = node.value !== undefined && node.value !== null ? node.value : "";
+      nodeBox.appendChild(dataBox);
+
+      const nextBox = document.createElement("div");
+      nextBox.className = "ll-next";
+      nextBox.textContent = "•";
+      nodeBox.appendChild(nextBox);
+
+      col.appendChild(nodeBox);
+
+      // Index label
+      const idxLabel = document.createElement("span");
+      idxLabel.className = "index-label";
+      if (idx === 0 && idx === nodes.length - 1) {
+        idxLabel.textContent = "[0] (front/rear)";
+      } else if (idx === 0) {
+        idxLabel.textContent = "[0] (front)";
+      } else if (idx === nodes.length - 1) {
+        idxLabel.textContent = `[${idx}] (rear)`;
+      } else {
+        idxLabel.textContent = `[${idx}]`;
+      }
+      col.appendChild(idxLabel);
+
+      wrapper.appendChild(col);
+
+      // Arrow connector
+      if (node.arrow !== "none") {
+        const arrow = document.createElement("div");
+        arrow.className = "ll-arrow";
+        arrow.textContent = "──▶";
+        wrapper.appendChild(arrow);
+      }
+
+      queueChainContainer.appendChild(wrapper);
+    });
+
+    // Terminal NULL Box (rear->next)
+    const nullWrapper = document.createElement("div");
+    nullWrapper.className = "ll-node-wrapper";
+    const nullCol = document.createElement("div");
+    nullCol.className = "ll-null-col";
+
+    const nullPtr = document.createElement("div");
+    nullPtr.className = "pointers-container";
+    if (pointers["null"]) {
+      const ptrList = Array.isArray(pointers["null"]) ? pointers["null"] : [pointers["null"]];
+      ptrList.forEach(p => {
+        const badge = document.createElement("span");
+        badge.className = `pointer-badge ${getQueueBadgeClass(p)}`;
+        badge.textContent = p;
+        nullPtr.appendChild(badge);
+      });
+    }
+    nullCol.appendChild(nullPtr);
+
+    const nullBox = document.createElement("div");
+    nullBox.className = "ll-null";
+    nullBox.textContent = "NULL (rear->next)";
+    nullCol.appendChild(nullBox);
+
+    nullWrapper.appendChild(nullCol);
+    queueChainContainer.appendChild(nullWrapper);
+  }
+
+  // Aux stage
+  if (auxNode && auxNode.value !== undefined) {
+    queueAuxStage.style.display = "flex";
+    queueAuxTitle.textContent = auxNode.title || "Allocated Node (createNode / temp):";
+    queueAuxContainer.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "ll-node-col";
+
+    const auxPtr = document.createElement("div");
+    auxPtr.className = "pointers-container";
+    if (auxNode.label) {
+      const badge = document.createElement("span");
+      badge.className = `pointer-badge ${getQueueBadgeClass(auxNode.label)}`;
+      badge.textContent = auxNode.label;
+      auxPtr.appendChild(badge);
+    }
+    wrap.appendChild(auxPtr);
+
+    const auxNodeBox = document.createElement("div");
+    auxNodeBox.className = `ll-node state-${auxNode.state || "success"}`;
+
+    const dataBox = document.createElement("div");
+    dataBox.className = "ll-data";
+    dataBox.textContent = auxNode.value;
+    auxNodeBox.appendChild(dataBox);
+
+    const nextBox = document.createElement("div");
+    nextBox.className = "ll-next";
+    nextBox.textContent = auxNode.nextDesc || "NULL";
+    auxNodeBox.appendChild(nextBox);
+
+    wrap.appendChild(auxNodeBox);
+    queueAuxContainer.appendChild(wrap);
+  } else {
+    queueAuxStage.style.display = "none";
+  }
+
+  if (queueStatusBox) queueStatusBox.textContent = status;
+  if (queueCodeBox && code) queueCodeBox.textContent = code;
+}
+
+function setQueueSimulationSteps(generatedSteps) {
+  pauseQueuePlayback();
+  queueSteps = generatedSteps;
+  queueCurrentStepIndex = 0;
+  if (queueSteps.length > 0) {
+    renderQueueState(queueSteps[0]);
+  }
+  updateQueuePlaybackControls();
+}
+
+function clearQueueSimulation() {
+  queueSteps = [];
+  queueCurrentStepIndex = 0;
+  updateQueuePlaybackControls();
+}
+
+function stepQueueForward() {
+  if (queueCurrentStepIndex < queueSteps.length - 1) {
+    queueCurrentStepIndex++;
+    renderQueueState(queueSteps[queueCurrentStepIndex]);
+    updateQueuePlaybackControls();
+  } else {
+    pauseQueuePlayback();
+  }
+}
+
+function stepQueueBackward() {
+  if (queueCurrentStepIndex > 0) {
+    queueCurrentStepIndex--;
+    renderQueueState(queueSteps[queueCurrentStepIndex]);
+    updateQueuePlaybackControls();
+  }
+}
+
+function toggleQueuePlayPause() {
+  if (queueIsPlaying) {
+    pauseQueuePlayback();
+  } else {
+    if (queueSteps.length === 0) return;
+    if (queueCurrentStepIndex >= queueSteps.length - 1) {
+      queueCurrentStepIndex = 0;
+      renderQueueState(queueSteps[0]);
+    }
+    queueIsPlaying = true;
+    if (btnQueuePlayPause) {
+      btnQueuePlayPause.textContent = "Pause";
+      btnQueuePlayPause.classList.add("btn-primary");
+    }
+    queuePlayInterval = setInterval(stepQueueForward, queuePlaySpeed);
+  }
+}
+
+function pauseQueuePlayback() {
+  queueIsPlaying = false;
+  clearInterval(queuePlayInterval);
+  if (btnQueuePlayPause) {
+    btnQueuePlayPause.textContent = "Auto Play";
+    btnQueuePlayPause.classList.remove("btn-primary");
+  }
+}
+
+function resetQueueSimulation() {
+  pauseQueuePlayback();
+  if (queueSteps.length > 0) {
+    queueCurrentStepIndex = 0;
+    renderQueueState(queueSteps[0]);
+    updateQueuePlaybackControls();
+  }
+}
+
+function updateQueuePlaybackControls() {
+  if (!btnQueuePrevStep) return;
+  const total = queueSteps.length;
+  const current = total > 0 ? queueCurrentStepIndex + 1 : 0;
+  if (queueStepCounter) queueStepCounter.textContent = `${current} / ${total}`;
+
+  btnQueuePrevStep.disabled = total === 0 || queueCurrentStepIndex === 0;
+  btnQueueNextStep.disabled = total === 0 || queueCurrentStepIndex >= total - 1;
+  btnQueuePlayPause.disabled = total === 0;
+  btnQueueResetAlgo.disabled = total === 0;
+}
+
+// --- Queue Algorithms (C Parity) ---
+
+function generateQueueEnqueueSteps(item) {
+  const orig = [...currentQueue];
+  const genSteps = [];
+
+  // Step 1: createNode(item)
+  const baseNodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const initialPointers = {};
+  if (orig.length === 1) {
+    initialPointers[0] = ["front", "rear"];
+  } else if (orig.length > 1) {
+    initialPointers[0] = ["front"];
+    initialPointers[orig.length - 1] = ["rear"];
+  } else {
+    initialPointers["null"] = ["front=NULL", "rear=NULL"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: baseNodes,
+    pointers: initialPointers,
+    auxNode: {
+      label: "newNode",
+      value: item,
+      nextDesc: "NULL",
+      state: "success",
+      title: "createNode(item) - Heap Allocation:"
+    },
+    status: `enqueue(&q, ${item}): Allocating newNode in memory via createNode(${item}). newNode->data = ${item}; newNode->next = NULL;`,
+    code: `NodePtr newNode = createNode(item);\nnewNode->data = ${item};\nnewNode->next = NULL;`
+  }));
+
+  if (orig.length === 0) {
+    // Empty queue: q->front = newNode; q->rear = newNode;
+    genSteps.push(createQueueStep({
+      nodes: [{ value: item, state: "success", arrow: "right" }],
+      pointers: { 0: ["front", "rear"] },
+      auxNode: null,
+      status: `Empty queue (q->rear == NULL): new node is both front and rear. q->front = newNode; q->rear = newNode;`,
+      code: `if (q->rear == NULL) {\n    q->front = newNode;\n    q->rear = newNode;\n    return;\n}`
+    }));
+
+    currentQueue = [item];
+  } else {
+    // Step 2: q->rear->next = newNode;
+    const step2Nodes = orig.map((v, idx) => ({
+      value: v,
+      state: idx === orig.length - 1 ? "shifted" : "default",
+      arrow: "right"
+    }));
+
+    genSteps.push(createQueueStep({
+      nodes: step2Nodes,
+      pointers: initialPointers,
+      auxNode: {
+        label: "newNode",
+        value: item,
+        nextDesc: "NULL",
+        state: "shifted",
+        title: "q->rear->next = newNode - Connecting Link:"
+      },
+      status: `q->rear->next = newNode; Linking current rear node (${orig[orig.length - 1]}) to newNode (${item}).`,
+      code: `q->rear->next = newNode; // Link current rear to newNode`
+    }));
+
+    // Step 3: q->rear = newNode;
+    const newQueue = [...orig, item];
+    const finalNodes = newQueue.map((v, idx) => ({
+      value: v,
+      state: idx === newQueue.length - 1 ? "success" : "default",
+      arrow: "right"
+    }));
+
+    const finalPointers = {
+      0: ["front"],
+      [newQueue.length - 1]: ["rear", "newNode"]
+    };
+
+    genSteps.push(createQueueStep({
+      nodes: finalNodes,
+      pointers: finalPointers,
+      auxNode: null,
+      status: `q->rear = newNode; rear pointer moved forward to newNode (${item}). Enqueue complete! Queue size: ${newQueue.length}.`,
+      code: `q->rear = newNode; // rear updated to newNode`
+    }));
+
+    currentQueue = newQueue;
+  }
+
+  if (inputQueueSize) inputQueueSize.value = currentQueue.length;
+  setQueueSimulationSteps(genSteps);
+}
+
+function generateQueueDequeueSteps() {
+  const orig = [...currentQueue];
+  const genSteps = [];
+
+  if (orig.length === 0) {
+    genSteps.push(createQueueStep({
+      nodes: [],
+      pointers: { null: ["front=NULL", "rear=NULL"] },
+      status: `Queue underflow! isEmpty(&q) == 1. Nothing to dequeue. return 0;`,
+      code: `if (isEmpty(q)) {\n    printf("Queue underflow! Nothing to dequeue.\\n");\n    return 0;\n}`
+    }));
+    setQueueSimulationSteps(genSteps);
+    return;
+  }
+
+  const dequeuedVal = orig[0];
+
+  // Step 1: NodePtr temp = q->front;
+  const step1Nodes = orig.map((v, idx) => ({
+    value: v,
+    state: idx === 0 ? "target" : "default",
+    arrow: "right"
+  }));
+  const step1Pointers = {};
+  if (orig.length === 1) {
+    step1Pointers[0] = ["front", "rear", "temp"];
+  } else {
+    step1Pointers[0] = ["front", "temp"];
+    step1Pointers[orig.length - 1] = ["rear"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: step1Nodes,
+    pointers: step1Pointers,
+    status: `NodePtr temp = q->front; Saving reference to front node in temp (value: ${dequeuedVal}).`,
+    code: `NodePtr temp = q->front;\nif (item != NULL) {\n    *item = temp->data; // *item = ${dequeuedVal}\n}`
+  }));
+
+  // Step 2: q->front = q->front->next;
+  const step2Nodes = orig.map((v, idx) => ({
+    value: v,
+    state: idx === 0 ? "eliminated" : (idx === 1 ? "current" : "default"),
+    arrow: idx === 0 ? "broken" : "right"
+  }));
+  const step2Pointers = { 0: ["temp"] };
+  if (orig.length > 1) {
+    step2Pointers[1] = ["front"];
+    if (orig.length === 2) {
+      step2Pointers[1] = ["front", "rear"];
+    } else {
+      step2Pointers[orig.length - 1] = ["rear"];
+    }
+  } else {
+    step2Pointers["null"] = ["front=NULL", "rear=NULL"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: step2Nodes,
+    pointers: step2Pointers,
+    status: `q->front = q->front->next; ${orig.length === 1 ? "Queue became empty: q->rear = NULL;" : `front pointer moved to next node (${orig[1]}).`}`,
+    code: `q->front = q->front->next;\nif (q->front == NULL) {\n    q->rear = NULL; // rear must not point to freed memory\n}`
+  }));
+
+  // Step 3: free(temp); return 1;
+  const newQueue = orig.slice(1);
+  const finalNodes = newQueue.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const finalPointers = {};
+  if (newQueue.length === 1) {
+    finalPointers[0] = ["front", "rear"];
+  } else if (newQueue.length > 1) {
+    finalPointers[0] = ["front"];
+    finalPointers[newQueue.length - 1] = ["rear"];
+  } else {
+    finalPointers["null"] = ["front=NULL", "rear=NULL"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: finalNodes,
+    pointers: finalPointers,
+    auxNode: null,
+    status: `free(temp); Deallocated front node. Dequeued value: ${dequeuedVal}. return 1;`,
+    code: `free(temp);\nreturn 1; // Dequeued: ${dequeuedVal}`
+  }));
+
+  currentQueue = newQueue;
+  if (inputQueueSize) inputQueueSize.value = newQueue.length;
+  setQueueSimulationSteps(genSteps);
+}
+
+function generateQueuePeekSteps() {
+  const orig = [...currentQueue];
+  const genSteps = [];
+
+  if (orig.length === 0) {
+    genSteps.push(createQueueStep({
+      nodes: [],
+      pointers: { null: ["front=NULL", "rear=NULL"] },
+      status: `isEmpty(&q) == 1. Queue is empty! peek(&q, &item) returns 0.`,
+      code: `if (isEmpty(q)) {\n    return 0;\n}`
+    }));
+  } else {
+    const val = orig[0];
+    const nodes = orig.map((v, idx) => ({
+      value: v,
+      state: idx === 0 ? "success" : "default",
+      arrow: "right"
+    }));
+
+    const pointers = {};
+    if (orig.length === 1) {
+      pointers[0] = ["front", "rear", "*item"];
+    } else {
+      pointers[0] = ["front", "*item"];
+      pointers[orig.length - 1] = ["rear"];
+    }
+
+    genSteps.push(createQueueStep({
+      nodes,
+      pointers,
+      status: `peek(&q, &item): Front item inspected without removing. *item = ${val}. return 1 (success);`,
+      code: `if (isEmpty(q)) {\n    return 0;\n}\n*item = q->front->data; // *item = ${val}\nreturn 1;`
+    }));
+  }
+
+  setQueueSimulationSteps(genSteps);
+}
+
+function generateQueueIsEmptySteps() {
+  const orig = [...currentQueue];
+  const genSteps = [];
+  const empty = orig.length === 0;
+
+  const nodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const pointers = {};
+  if (orig.length === 1) {
+    pointers[0] = ["front", "rear"];
+  } else if (orig.length > 1) {
+    pointers[0] = ["front"];
+    pointers[orig.length - 1] = ["rear"];
+  } else {
+    pointers["null"] = ["front=NULL", "rear=NULL"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes,
+    pointers,
+    status: `isEmpty(&q): Checking q->front == NULL. Result: ${empty ? "1 (true - Queue is empty)" : "0 (false - Queue has items)"}.`,
+    code: `int isEmpty(Queue *q) {\n    return q->front == NULL; // Evaluates to: ${empty ? "1 (EMPTY)" : "0 (NOT EMPTY)"}\n}`
+  }));
+
+  setQueueSimulationSteps(genSteps);
+}
+
+function generateQueueCountNodesSteps() {
+  const orig = [...currentQueue];
+  const n = orig.length;
+  const genSteps = [];
+
+  const baseNodes = orig.map(v => ({ value: v, state: "default", arrow: "right" }));
+  const initialPointers = {};
+  if (n === 1) {
+    initialPointers[0] = ["front", "rear", "current"];
+  } else if (n > 1) {
+    initialPointers[0] = ["front", "current"];
+    initialPointers[n - 1] = ["rear"];
+  } else {
+    initialPointers["null"] = ["front=NULL", "rear=NULL", "current=NULL"];
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: baseNodes,
+    pointers: initialPointers,
+    status: `countNodes(&q): Initializing int count = 0; NodePtr current = q->front;`,
+    code: `int countNodes(Queue *q) {\n    int count = 0;\n    NodePtr current = q->front;\n\n    while (current != NULL) {\n        count++;\n        current = current->next;\n    }\n    return count;\n}`
+  }));
+
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    count++;
+    const stepNodes = orig.map((v, idx) => ({
+      value: v,
+      state: idx === i ? "current" : (idx < i ? "success" : "default"),
+      arrow: "right"
+    }));
+
+    const pointers = { [i]: ["current", `count=${count}`] };
+    if (i === 0) pointers[i].unshift("front");
+    if (i === n - 1 && !pointers[i].includes("rear")) pointers[i].push("rear");
+    if (i > 0 && n > 1) {
+      if (!pointers[0]) pointers[0] = ["front"];
+      if (!pointers[n - 1]) pointers[n - 1] = ["rear"];
+    }
+
+    genSteps.push(createQueueStep({
+      nodes: stepNodes,
+      pointers,
+      status: `while (current != NULL): At node [${i}] (${orig[i]}). count++ (count = ${count}). current = current->next;`,
+      code: `count++; // count = ${count}\ncurrent = current->next;`
+    }));
+  }
+
+  const finalNodes = orig.map(v => ({ value: v, state: "success", arrow: "right" }));
+  const finalPointers = {};
+  if (n === 1) finalPointers[0] = ["front", "rear"];
+  else if (n > 1) {
+    finalPointers[0] = ["front"];
+    finalPointers[n - 1] = ["rear"];
+  }
+  finalPointers["null"] = ["current=NULL"];
+
+  genSteps.push(createQueueStep({
+    nodes: finalNodes,
+    pointers: finalPointers,
+    status: `current == NULL: Loop complete. Total nodes in queue = ${count}. return count;`,
+    code: `return count; // Total nodes: ${count}`
+  }));
+
+  setQueueSimulationSteps(genSteps);
+}
+
+function generateQueueClearSteps() {
+  let list = [...currentQueue];
+  const genSteps = [];
+
+  if (list.length === 0) {
+    genSteps.push(createQueueStep({
+      nodes: [],
+      pointers: { null: ["front=NULL", "rear=NULL"] },
+      status: `clear(&q): Queue is already empty.`,
+      code: `void clear(Queue *q) {\n    while (!isEmpty(q)) {\n        dequeue(q, NULL);\n    }\n}`
+    }));
+    setQueueSimulationSteps(genSteps);
+    return;
+  }
+
+  genSteps.push(createQueueStep({
+    nodes: list.map(v => ({ value: v, state: "default", arrow: "right" })),
+    pointers: list.length === 1 ? { 0: ["front", "rear"] } : { 0: ["front"], [list.length - 1]: ["rear"] },
+    status: `clear(&q): Starting loop while (!isEmpty(q)) to dequeue and free every node.`,
+    code: `void clear(Queue *q) {\n    while (!isEmpty(q)) {\n        dequeue(q, NULL);\n    }\n}`
+  }));
+
+  while (list.length > 0) {
+    const val = list[0];
+    genSteps.push(createQueueStep({
+      nodes: list.map((v, idx) => ({ value: v, state: idx === 0 ? "target" : "default", arrow: "right" })),
+      pointers: list.length === 1 ? { 0: ["front", "rear", "temp"] } : { 0: ["front", "temp"], [list.length - 1]: ["rear"] },
+      status: `dequeue(q, NULL): Freeing front node (${val}).`,
+      code: `dequeue(q, NULL); // Freeing ${val}`
+    }));
+
+    list = list.slice(1);
+
+    const stepPointers = {};
+    if (list.length === 1) {
+      stepPointers[0] = ["front", "rear"];
+    } else if (list.length > 1) {
+      stepPointers[0] = ["front"];
+      stepPointers[list.length - 1] = ["rear"];
+    } else {
+      stepPointers["null"] = ["front=NULL", "rear=NULL"];
+    }
+
+    genSteps.push(createQueueStep({
+      nodes: list.map(v => ({ value: v, state: "default", arrow: "right" })),
+      pointers: stepPointers,
+      status: `Dequeued ${val}. ${list.length > 0 ? `Next front is ${list[0]}.` : "Queue is now empty (front=NULL, rear=NULL)."}` ,
+      code: `// Queue remaining: ${list.length} nodes`
+    }));
+  }
+
+  currentQueue = [];
+  if (inputQueueSize) inputQueueSize.value = 0;
+  setQueueSimulationSteps(genSteps);
+}
+
 // Run init on load
 document.addEventListener("DOMContentLoaded", () => {
   init();
   initLinkedListVisualizer();
+  initStackVisualizer();
+  initQueueVisualizer();
 });
